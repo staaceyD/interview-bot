@@ -1,4 +1,4 @@
-# ai-chatbot
+# interview-bot
 
 A local chatbot for practising software engineering interview questions —
 languages and frameworks as well as engineering fundamentals such as system
