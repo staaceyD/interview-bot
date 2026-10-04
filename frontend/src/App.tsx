@@ -5,9 +5,20 @@ import type { Api } from "./api/client";
 import type { Difficulty, Explanation, Grade, Question, Topic } from "./api/types";
 import { GradeCard } from "./components/GradeCard";
 import { ModelPicker } from "./components/ModelPicker";
+import { NoteDialog } from "./components/NoteDialog";
+import { NotesTab } from "./components/NotesTab";
 import { QuestionCard } from "./components/QuestionCard";
 import { TopicPicker } from "./components/TopicPicker";
+import { recallNotes, rememberNotes, writeNote } from "./notes";
+import type { Note } from "./notes";
 import { forgetSession, recallSession, rememberSession } from "./storage";
+
+const TABS = [
+  { value: "interview", label: "Interview" },
+  { value: "notes", label: "Notes" },
+] as const;
+
+type Tab = (typeof TABS)[number]["value"];
 
 export function App({ api = defaultApi }: { api?: Api }) {
   const [topics, setTopics] = useState<Topic[]>(["python"]);
@@ -23,6 +34,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
   // never sees a flash of the restoring splash.
   const [resuming, setResuming] = useState(() => recallSession() !== null);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("interview");
+  // Notes outlive the interview they were written during, so they are read
+  // from storage once and never cleared by starting over.
+  const [notes, setNotes] = useState<Note[]>(recallNotes);
+  const [noting, setNoting] = useState(false);
 
   const resumed = useRef(false);
 
@@ -126,6 +142,21 @@ export function App({ api = defaultApi }: { api?: Api }) {
       setExplanation(await api.explainQuestion(sessionId, question.question_id));
     });
 
+  // Written straight to storage rather than on unload: a note is a single
+  // sentence somebody expects to still be there after they close the tab.
+  function keep(kept: Note[]) {
+    setNotes(kept);
+    rememberNotes(kept);
+  }
+
+  const addNote = (text: string) => {
+    // Newest first, the order the Notes tab reads in.
+    keep([writeNote(text, question?.topic ?? null), ...notes]);
+    setNoting(false);
+  };
+
+  const deleteNote = (id: string) => keep(notes.filter((note) => note.id !== id));
+
   function startOver() {
     forgetSession();
     setSessionId(null);
@@ -148,48 +179,94 @@ export function App({ api = defaultApi }: { api?: Api }) {
     <main>
       <h1>Interview Bot</h1>
 
-      <ModelPicker modelProvider={modelProvider} disabled={busy} onChange={chooseModel} />
-
-      {sessionId === null ? (
-        <TopicPicker
-          topics={topics}
-          difficulty={difficulty}
-          disabled={busy}
-          onTopicsChange={setTopics}
-          onDifficultyChange={setDifficulty}
-          onStart={start}
-        />
-      ) : (
-        <>
-          {question && !grade && (
-            <QuestionCard
-              // Remount on a new question so the textarea starts empty.
-              key={question.question_id}
-              question={question}
-              disabled={busy}
-              onSubmit={answer}
-            />
-          )}
-          {grade && question && (
-            <GradeCard
-              // Remount on a new question so the details start folded away.
-              key={question.question_id}
-              grade={grade}
-              explanation={explanation}
-              disabled={busy}
-              onLearnMore={learnMore}
-              onNext={next}
-            />
-          )}
-
-          <button type="button" className="secondary" onClick={startOver} disabled={busy}>
-            Start over
+      <div className="tabs" role="tablist">
+        {TABS.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            id={`tab-${value}`}
+            aria-controls={`panel-${value}`}
+            aria-selected={tab === value}
+            onClick={() => setTab(value)}
+          >
+            {label}
           </button>
-        </>
+        ))}
+      </div>
+
+      {tab === "notes" ? (
+        <div role="tabpanel" id="panel-notes" aria-labelledby="tab-notes">
+          <NotesTab notes={notes} onDelete={deleteNote} />
+        </div>
+      ) : (
+        <div role="tabpanel" id="panel-interview" aria-labelledby="tab-interview">
+          <ModelPicker modelProvider={modelProvider} disabled={busy} onChange={chooseModel} />
+
+          {sessionId === null ? (
+            <TopicPicker
+              topics={topics}
+              difficulty={difficulty}
+              disabled={busy}
+              onTopicsChange={setTopics}
+              onDifficultyChange={setDifficulty}
+              onStart={start}
+            />
+          ) : (
+            <>
+              {question && !grade && (
+                <QuestionCard
+                  // Remount on a new question so the textarea starts empty.
+                  key={question.question_id}
+                  question={question}
+                  disabled={busy}
+                  onSubmit={answer}
+                />
+              )}
+              {grade && question && (
+                <GradeCard
+                  // Remount on a new question so the details start folded away.
+                  key={question.question_id}
+                  grade={grade}
+                  explanation={explanation}
+                  disabled={busy}
+                  onLearnMore={learnMore}
+                  onNext={next}
+                />
+              )}
+            </>
+          )}
+
+          <div className="actions">
+            {/* Never disabled by `busy`: jotting a note touches nothing the
+                model is holding, and waiting is when it comes to mind. */}
+            <button type="button" className="secondary" onClick={() => setNoting(true)}>
+              Note to self
+            </button>
+            {sessionId !== null && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={startOver}
+                disabled={busy}
+              >
+                Start over
+              </button>
+            )}
+          </div>
+
+          {busy && <p role="status">Thinking…</p>}
+          {error && <p role="alert">{error}</p>}
+        </div>
       )}
 
-      {busy && <p role="status">Thinking…</p>}
-      {error && <p role="alert">{error}</p>}
+      {noting && (
+        <NoteDialog
+          topic={question?.topic ?? null}
+          onSave={addNote}
+          onClose={() => setNoting(false)}
+        />
+      )}
     </main>
   );
 }
