@@ -221,6 +221,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
                   question={question}
                   disabled={busy}
                   onSubmit={answer}
+                  onSkip={next}
                 />
               )}
               {grade && question && (

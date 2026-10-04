@@ -7,9 +7,10 @@ type Props = {
   question: Question;
   disabled: boolean;
   onSubmit: (answer: string) => void;
+  onSkip: () => void;
 };
 
-export function QuestionCard({ question, disabled, onSubmit }: Props) {
+export function QuestionCard({ question, disabled, onSubmit, onSkip }: Props) {
   const [answer, setAnswer] = useState("");
 
   return (
@@ -29,13 +30,20 @@ export function QuestionCard({ question, disabled, onSubmit }: Props) {
         onChange={(event) => setAnswer(event.target.value)}
       />
 
-      <button
-        type="button"
-        onClick={() => onSubmit(answer)}
-        disabled={disabled || answer.trim() === ""}
-      >
-        Submit answer
-      </button>
+      <div className="actions">
+        <button
+          type="button"
+          onClick={() => onSubmit(answer)}
+          disabled={disabled || answer.trim() === ""}
+        >
+          Submit answer
+        </button>
+        {/* For a question you already know. Enabled whatever is in the
+            textarea: there is nothing to type if you are not answering. */}
+        <button type="button" className="secondary" onClick={onSkip} disabled={disabled}>
+          Skip
+        </button>
+      </div>
     </section>
   );
 }

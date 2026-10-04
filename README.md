@@ -1,4 +1,4 @@
-# ai-chatbot
+# interview-bot
 
 A local chatbot for practising software engineering interview questions —
 languages and frameworks as well as engineering fundamentals such as system
@@ -69,6 +69,10 @@ on **Ollama (free)**, the model on your own machine, and switching it to
 **Claude** moves the interview onto the hosted model from the next question
 onwards — see [Running against a hosted model](#running-against-a-hosted-model)
 for what that needs and what it costs.
+
+**Skip**, under the answer box, passes on a question you already know without
+answering it. Nothing is graded, and the question does not come round again —
+each new question is asked to avoid the ones already put up.
 
 A grade comes with a **Learn more** button. It writes the answer out in full —
 a few paragraphs, every key point expanded, and the mistakes people usually
