@@ -217,6 +217,81 @@ describe("answering", () => {
   });
 });
 
+describe("skipping", () => {
+  it("moves straight to the next question without grading", async () => {
+    const second = { ...question, question_id: "q2", prompt: "What is a decorator?" };
+    const api = fakeApi({
+      nextQuestion: vi.fn().mockResolvedValueOnce(question).mockResolvedValueOnce(second),
+    });
+    const user = await startInterview(api);
+
+    await user.click(screen.getByRole("button", { name: /^skip$/i }));
+
+    expect(await screen.findByText(second.prompt)).toBeInTheDocument();
+    expect(api.submitAnswer).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("score")).not.toBeInTheDocument();
+  });
+
+  it("can be used with nothing typed, unlike submitting", async () => {
+    const api = fakeApi();
+    const user = await startInterview(api);
+
+    expect(screen.getByRole("button", { name: /submit answer/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^skip$/i })).toBeEnabled();
+    expect(user).toBeDefined();
+  });
+
+  it("clears a part-written answer when the next question arrives", async () => {
+    const second = { ...question, question_id: "q2", prompt: "What is a decorator?" };
+    const api = fakeApi({
+      nextQuestion: vi.fn().mockResolvedValueOnce(question).mockResolvedValueOnce(second),
+    });
+    const user = await startInterview(api);
+
+    await user.type(screen.getByLabelText(/your answer/i), "Half an answer");
+    await user.click(screen.getByRole("button", { name: /^skip$/i }));
+
+    await screen.findByText(second.prompt);
+    expect(screen.getByLabelText(/your answer/i)).toHaveValue("");
+  });
+
+  it("keeps the question on screen until the next one arrives", async () => {
+    let release: (question: Question) => void = () => {};
+    const api = fakeApi({
+      nextQuestion: vi.fn().mockResolvedValueOnce(question).mockReturnValueOnce(
+        new Promise<Question>((resolve) => {
+          release = resolve;
+        }),
+      ),
+    });
+    const user = await startInterview(api);
+
+    await user.click(screen.getByRole("button", { name: /^skip$/i }));
+
+    expect(screen.getByText(question.prompt)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^skip$/i })).toBeDisabled();
+
+    release({ ...question, question_id: "q2", prompt: "What is a decorator?" });
+    expect(await screen.findByText("What is a decorator?")).toBeInTheDocument();
+  });
+
+  it("reports a failure without losing the question", async () => {
+    const api = fakeApi({
+      nextQuestion: vi
+        .fn()
+        .mockResolvedValueOnce(question)
+        .mockRejectedValueOnce(new ApiError("The model is unavailable: boom")),
+    });
+    const user = await startInterview(api);
+
+    await user.click(screen.getByRole("button", { name: /^skip$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The model is unavailable: boom");
+    expect(screen.getByText(question.prompt)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^skip$/i })).toBeEnabled();
+  });
+});
+
 describe("moving on", () => {
   it("clears the previous answer when the next question arrives", async () => {
     const second = { ...question, question_id: "q2", prompt: "What is a decorator?" };
