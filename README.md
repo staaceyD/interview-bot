@@ -7,6 +7,34 @@ questions jump between them, shuffled, the way a real interview does. Answers
 are graded by a model — either one running on your own machine, or a hosted Claude model if
 you would rather have the speed.
 
+## Screenshots
+
+Tick the topics you want, and how hard the questions should be. Several topics
+and the interview moves between them, shuffled.
+
+![Picking topics and difficulty](docs/screenshots/topics.jpg)
+
+A question comes tagged with the topic it came from, so a mixed interview still
+says what it is asking about.
+
+![A generated question, tagged with its topic and difficulty](docs/screenshots/question.jpg)
+
+Answers are graded out of five, against the key points the question was written
+around — what you covered, and what you missed.
+
+![An answer graded five out of five, with the points it covered](docs/screenshots/grade.jpg)
+
+**Learn more** writes the answer out in full, so you can learn the question
+without going off to search for it. It is written in the background while you
+are still reading and typing.
+
+![The worked answer, written out in full](docs/screenshots/worked-answer.jpg)
+
+**Note to self** keeps a topic to come back to, and the notes collect under
+their own tab.
+
+![The notes tab, listing saved notes by topic and date](docs/screenshots/notes.jpg)
+
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
