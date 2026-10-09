@@ -160,3 +160,39 @@ async def test_explanation_survives_a_model_that_skips_the_optional_parts() -> N
 async def test_explanation_without_an_answer_becomes_llm_error() -> None:
     with pytest.raises(LLMError, match="unusable Explanation"):
         await interviewer_replying('{"points": []}').explain(question=QUESTION)
+
+
+async def test_worked_answer_survives_a_model_that_escapes_its_json_twice() -> None:
+    # The two characters \ and n, as a doubly-escaped model writes them, rather
+    # than a newline.
+    doubly_escaped = "Paragraph one.\\n\\n```ts\\nconst x = 1;\\n```\\n\\nParagraph two."
+
+    explanation = await interviewer_replying(json.dumps({"answer": doubly_escaped})).explain(
+        question=QUESTION
+    )
+
+    assert explanation.answer == "Paragraph one.\n\n```ts\nconst x = 1;\n```\n\nParagraph two."
+    assert "\\n" not in explanation.answer
+
+
+async def test_a_correctly_escaped_worked_answer_is_left_alone() -> None:
+    answer = "Paragraph one.\n\nParagraph two."
+
+    explanation = await interviewer_replying(json.dumps({"answer": answer})).explain(
+        question=QUESTION
+    )
+
+    assert explanation.answer == answer
+
+
+async def test_an_answer_about_escape_sequences_keeps_them() -> None:
+    # The model means the characters \ and n here, and is right to escape them;
+    # the real newlines around it are what say the JSON was written correctly.
+    answer = "In Python, `\\n` is a newline.\n\nUse `\\t` for a tab."
+
+    explanation = await interviewer_replying(json.dumps({"answer": answer})).explain(
+        question=QUESTION
+    )
+
+    assert explanation.answer == answer
+    assert "`\\n`" in explanation.answer

@@ -66,7 +66,19 @@ class Interviewer:
             json_mode=True,
             timeout_seconds=self._explain_timeout_seconds,
         )
-        return _parse(reply, Explanation)
+        explanation = _parse(reply, Explanation)
+        return explanation.model_copy(update={"answer": _unescaped(explanation.answer)})
+
+
+_ESCAPE = re.compile(r"\\(.)", re.DOTALL)
+_ESCAPED = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\"}
+
+
+def _unescaped(answer: str) -> str:
+    if "\n" in answer or "\\n" not in answer:
+        return answer
+    # An escape the model invented, such as \_, is left as the model wrote it.
+    return _ESCAPE.sub(lambda match: _ESCAPED.get(match.group(1), match.group(0)), answer)
 
 
 def _parse[T: BaseModel](reply: str, model: type[T]) -> T:
