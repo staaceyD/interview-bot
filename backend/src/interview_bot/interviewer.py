@@ -70,16 +70,6 @@ class Interviewer:
         return explanation.model_copy(update={"answer": _unescaped(explanation.answer)})
 
 
-# Small local models sometimes escape their JSON a second time, so a newline
-# arrives as the two characters \\ and n. The worked answer is the only field
-# written as markdown — paragraphs split by blank lines, around a fenced example
-# — so it is the only one that collapses into an unreadable run-on when that
-# happens, and the only one repaired here.
-#
-# Repairing every string would be wrong: "What does \\n do in Python?" is a
-# question a model is right to escape that way, and there is no telling it apart
-# from a mistake. An answer that is several paragraphs long always carries real
-# newlines when the model got it right, so their absence is the signal.
 _ESCAPE = re.compile(r"\\(.)", re.DOTALL)
 _ESCAPED = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\"}
 
