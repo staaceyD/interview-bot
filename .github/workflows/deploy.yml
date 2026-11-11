@@ -1,7 +1,5 @@
 name: Deploy
 
-# Only ever by hand: Actions → Deploy → Run workflow. Merging to main does not
-# deploy anything.
 on:
   workflow_dispatch:
 
@@ -11,7 +9,6 @@ concurrency:
 
 jobs:
   ci:
-    # The deploy hook deploys main, so main is the only branch it runs from.
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/ci.yml
 

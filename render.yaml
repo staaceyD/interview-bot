@@ -1,5 +1,4 @@
 # Render Blueprint for the hosted deployment, on the free plan.
-# https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: interview-bot
