@@ -2,16 +2,27 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, get_args
 
-from pydantic import model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ModelProvider = Literal["ollama", "anthropic", "echo"]
-StoreBackend = Literal["sqlite", "memory"]
+StoreBackend = Literal["sqlite", "memory", "postgres"]
 Environment = Literal["development", "production"]
+
+# Where `neon deploy` writes the Neon branch's variables: the repository root.
+NEON_ENV_FILE = Path(__file__).resolve().parents[3] / ".env.local"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="INTERVIEW_BOT_", env_file=".env")
+    model_config = SettingsConfigDict(
+        env_prefix="INTERVIEW_BOT_",
+        # Later files win: a .env of your own overrides what Neon wrote.
+        env_file=(NEON_ENV_FILE, ".env.local", ".env"),
+        # The Neon file carries variables this app has no use for.
+        extra="ignore",
+        # So a test can still pass database_url=... by name.
+        populate_by_name=True,
+    )
 
     # Production is the hosted deployment, where there is no Ollama next to the
     # server: it runs on Claude alone and offers nothing to switch to.
@@ -38,6 +49,21 @@ class Settings(BaseSettings):
 
     store_backend: StoreBackend = "sqlite"
     sqlite_path: Path = Path("interview_bot.db")
+    # Neon's own names, as `neon deploy` writes them, so nothing has to be
+    # renamed by hand. Only read with the postgres backend, so a local run stays
+    # on SQLite even with Neon's file in place.
+    # Pooled, through Neon's PgBouncer: every query the app makes.
+    database_url: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("INTERVIEW_BOT_DATABASE_URL", "DATABASE_URL"),
+    )
+    # Direct: creating the schema, which the pooler is not for.
+    database_url_unpooled: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "INTERVIEW_BOT_DATABASE_URL_UNPOOLED", "DATABASE_URL_UNPOOLED"
+        ),
+    )
 
     cors_origins: list[str] = ["http://localhost:5173"]
     # The built frontend, served by the API itself when set, so a deployment is
