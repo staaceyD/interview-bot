@@ -5,6 +5,8 @@ type Props = {
   topics: Topic[];
   difficulty: Difficulty;
   disabled: boolean;
+  // Why the interview cannot start yet, if there is something to do first.
+  blocked?: string;
   onTopicsChange: (topics: Topic[]) => void;
   onDifficultyChange: (difficulty: Difficulty) => void;
   onStart: () => void;
@@ -14,6 +16,7 @@ export function TopicPicker({
   topics,
   difficulty,
   disabled,
+  blocked,
   onTopicsChange,
   onDifficultyChange,
   onStart,
@@ -67,10 +70,15 @@ export function TopicPicker({
         ))}
       </select>
 
-      <button type="button" onClick={onStart} disabled={disabled || topics.length === 0}>
+      <button
+        type="button"
+        onClick={onStart}
+        disabled={disabled || blocked !== undefined || topics.length === 0}
+      >
         Start interview
       </button>
       {topics.length === 0 && <p className="hint">Choose at least one topic to begin.</p>}
+      {blocked && <p className="hint">{blocked}</p>}
     </section>
   );
 }

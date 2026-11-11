@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { api as defaultApi, ApiError } from "./api/client";
 import type { Api } from "./api/client";
 import { isHosted } from "./api/types";
-import type { Difficulty, Explanation, Grade, Question, Topic } from "./api/types";
+import type { Account, Difficulty, Explanation, Grade, Question, Topic } from "./api/types";
+import { AccountPanel } from "./components/AccountPanel";
 import { GradeCard } from "./components/GradeCard";
 import { ModelPicker } from "./components/ModelPicker";
 import { NoteDialog } from "./components/NoteDialog";
@@ -29,6 +30,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
   const [modelProvider, setModelProvider] = useState<string>(() =>
     isHosted() ? "anthropic" : "ollama",
   );
+  // Hosted, an interview needs a signed-in visitor with questions left. Null
+  // until the backend has said who, if anyone, is signed in.
+  const [account, setAccount] = useState<Account | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
   const [grade, setGrade] = useState<Grade | null>(null);
@@ -45,6 +49,24 @@ export function App({ api = defaultApi }: { api?: Api }) {
   const [noting, setNoting] = useState(false);
 
   const resumed = useRef(false);
+
+  useEffect(() => {
+    if (!isHosted()) return;
+    // Where a provider sends the visitor back to when sign-in did not finish.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("sign_in") === "failed") {
+      setError("Signing in did not finish. Try again.");
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+    api.account().then(setAccount, () =>
+      setError("Could not check whether you are signed in. Refresh to try again."),
+    );
+  }, [api]);
+
+  // After each question, so the count on screen is the backend's own.
+  const refreshAccount = async () => {
+    if (isHosted()) setAccount(await api.account());
+  };
 
   useEffect(() => {
     if (resumed.current) return;
@@ -74,9 +96,10 @@ export function App({ api = defaultApi }: { api?: Api }) {
         setGrade(state.current_grade);
         setExplanation(state.current_explanation);
       } catch (caught) {
-        // Only a 404 proves the session is gone. Forgetting the id on a passing
-        // failure would strand an interview the backend still has.
-        if (caught instanceof ApiError && caught.status === 404) {
+        // Only a 404 proves the session is gone, or a 401 that it is not this
+        // visitor's to resume. Forgetting the id on a passing failure would
+        // strand an interview the backend still has.
+        if (caught instanceof ApiError && (caught.status === 404 || caught.status === 401)) {
           forgetSession();
         } else {
           setError("Could not restore your last interview. Refresh to try again.");
@@ -110,6 +133,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
       setQuestion(first);
       setGrade(null);
       setExplanation(null);
+      await refreshAccount();
     });
 
   const next = () =>
@@ -119,6 +143,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
       setQuestion(following);
       setGrade(null);
       setExplanation(null);
+      await refreshAccount();
     });
 
   const answer = (text: string) =>
@@ -160,6 +185,22 @@ export function App({ api = defaultApi }: { api?: Api }) {
   };
 
   const deleteNote = (id: string) => keep(notes.filter((note) => note.id !== id));
+
+  const signOut = () =>
+    run(async () => {
+      await api.signOut();
+      startOver();
+      setAccount(await api.account());
+    });
+
+  // Why an interview cannot start yet, where it cannot.
+  const blocked = !isHosted()
+    ? undefined
+    : account?.user == null
+      ? "Sign in above to start."
+      : account.questions_left === 0
+        ? "You have used today's questions. They reset at midnight UTC."
+        : undefined;
 
   function startOver() {
     forgetSession();
@@ -205,7 +246,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
         </div>
       ) : (
         <div role="tabpanel" id="panel-interview" aria-labelledby="tab-interview">
-          {!isHosted() && (
+          {isHosted() ? (
+            <AccountPanel account={account} disabled={busy} onSignOut={signOut} />
+          ) : (
             <ModelPicker modelProvider={modelProvider} disabled={busy} onChange={chooseModel} />
           )}
 
@@ -214,6 +257,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
               topics={topics}
               difficulty={difficulty}
               disabled={busy}
+              blocked={blocked}
               onTopicsChange={setTopics}
               onDifficultyChange={setDifficulty}
               onStart={start}

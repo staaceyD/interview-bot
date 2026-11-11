@@ -1,10 +1,12 @@
 import type {
+  Account,
   Difficulty,
   Explanation,
   Grade,
   Question,
   Session,
   SessionState,
+  SignInProvider,
   Topic,
 } from "./types";
 
@@ -34,6 +36,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     throw new ApiError(await errorMessage(response), response.status);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -58,7 +61,15 @@ async function errorMessage(response: Response): Promise<string> {
   return `Request failed with status ${response.status}`;
 }
 
+// A full-page visit rather than a fetch: the provider's sign-in page has to
+// open in the window, and comes back to the app when it is done.
+export const signInUrl = (provider: SignInProvider) => `${BASE_URL}/auth/${provider}/login`;
+
 export const api = {
+  account: () => request<Account>("/auth/me"),
+
+  signOut: () => post<void>("/auth/logout"),
+
   resumeSession: (sessionId: string) =>
     request<SessionState>(`/sessions/${sessionId}`, {
       signal: AbortSignal.timeout(RESUME_TIMEOUT_MS),
