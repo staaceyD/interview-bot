@@ -221,3 +221,9 @@ __marimo__/
 *.db
 *.db-wal
 *.db-shm
+
+# Connection strings written by `neon deploy`
+.env.local
+.env.*.local
+.neon
+node_modules/

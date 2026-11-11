@@ -1,5 +1,4 @@
 # Render Blueprint for the hosted deployment, on the free plan.
-# https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: interview-bot
@@ -7,8 +6,6 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    # Deployed by .github/workflows/deploy.yml once CI has passed, never on a
-    # bare push.
     autoDeployTrigger: "off"
     envVars:
       # Asked for when the Blueprint is first applied, and never committed.

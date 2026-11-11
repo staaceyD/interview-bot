@@ -161,22 +161,6 @@ There is no Ollama next to the server, so the **Model** dropdown is gone and
 every interview runs on Claude. Ollama stays available when you run the app
 locally, as above.
 
-Claude is billed to the API key the deployment runs with, and anyone with the
-URL can use it — keep an eye on usage, or set a spend limit in the Anthropic
-console.
-
-One-time setup:
-
-1. In Render, **New → Blueprint**, and pick this repository. It reads
-   `render.yaml` and asks for `ANTHROPIC_API_KEY`.
-2. In the service's **Settings → Deploy Hook**, copy the URL.
-3. In GitHub, **Settings → Secrets and variables → Actions**, add it as
-   `RENDER_DEPLOY_HOOK_URL`.
-
-From then on, every push to `main` deploys once CI has passed
-(`.github/workflows/deploy.yml`). **Actions → Deploy → Run workflow** deploys by
-hand.
-
 On the free plan the service sleeps after 15 minutes without a visit, and the
 first request after that takes about a minute to wake it. Its disk does not
 survive a restart either, so an interview in progress is lost when it sleeps.

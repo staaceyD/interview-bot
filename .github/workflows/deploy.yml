@@ -1,11 +1,6 @@
 name: Deploy
 
-# Runs after CI finishes on main, and deploys only if it passed.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -13,11 +8,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ci:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
   deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push')
+    needs: ci
     runs-on: ubuntu-latest
     environment: production
     steps:
