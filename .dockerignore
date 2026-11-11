@@ -10,3 +10,5 @@
 **/*.db-shm
 **/.env
 docs
+**/.env.local
+**/.env.*.local

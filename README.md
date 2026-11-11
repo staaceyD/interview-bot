@@ -139,6 +139,9 @@ uv run ruff check .
 uv run ruff format .
 ```
 
+The Postgres store's tests run only when `INTERVIEW_BOT_TEST_DATABASE_URL`
+points at a database they may wipe; CI starts one for them.
+
 Frontend:
 
 ```sh
@@ -156,6 +159,16 @@ The hosted version runs on [Render](https://render.com)'s free plan, as one
 service: the `Dockerfile` builds the frontend and the API serves it, so there is
 one URL and nothing to configure for CORS.
 
+Interviews are kept in [Neon](https://neon.tech) Postgres, on its free plan,
+because Render's free disk does not survive a restart. The repository is linked
+to the Neon project (`.neon`, `neon.ts`): `neon deploy` writes the `production`
+branch's connection strings to `.env.local` at the repository root, which git
+and Docker both ignore. The backend reads them from there under Neon's own
+names — `DATABASE_URL`, pooled, for its queries, and `DATABASE_URL_UNPOOLED`,
+direct, for creating its tables — but only with
+`INTERVIEW_BOT_STORE_BACKEND=postgres`. A local run stays on SQLite, and never
+touches production by accident.
+
 It runs with `INTERVIEW_BOT_ENVIRONMENT=production`, which means Claude only.
 There is no Ollama next to the server, so the **Model** dropdown is gone and
 every interview runs on Claude. Ollama stays available when you run the app
@@ -168,7 +181,8 @@ console.
 One-time setup:
 
 1. In Render, **New → Blueprint**, and pick this repository. It reads
-   `render.yaml` and asks for `ANTHROPIC_API_KEY`.
+   `render.yaml` and asks for `ANTHROPIC_API_KEY`, and for `DATABASE_URL` and
+   `DATABASE_URL_UNPOOLED` — copy both from `.env.local`.
 2. In the service's **Settings → Deploy Hook**, copy the URL.
 3. In GitHub, **Settings → Secrets and variables → Actions**, add it as
    `RENDER_DEPLOY_HOOK_URL`.
@@ -178,6 +192,4 @@ Deploys happen only by hand: **Actions → Deploy → Run workflow**, on `main`
 deploys only if it passes. Merging to `main` deploys nothing.
 
 On the free plan the service sleeps after 15 minutes without a visit, and the
-first request after that takes about a minute to wake it. Its disk does not
-survive a restart either, so an interview in progress is lost when it sleeps.
-Notes are kept in the browser and are not affected.
+first request after that takes about a minute to wake it.

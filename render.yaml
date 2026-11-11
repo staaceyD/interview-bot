@@ -10,6 +10,15 @@ services:
     # Deployed only by hand, from .github/workflows/deploy.yml, never on a push.
     autoDeployTrigger: "off"
     envVars:
+      # The free disk does not survive a restart, so everything lives in Postgres.
+      - key: INTERVIEW_BOT_STORE_BACKEND
+        value: postgres
       # Asked for when the Blueprint is first applied, and never committed.
+      # Neon's two strings for the production branch, under the names
+      # `neon deploy` gives them: pooled for queries, direct for the schema.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
