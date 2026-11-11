@@ -6,7 +6,6 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    # Deployed only by hand, from .github/workflows/deploy.yml, never on a push.
     autoDeployTrigger: "off"
     envVars:
       # Asked for when the Blueprint is first applied, and never committed.
