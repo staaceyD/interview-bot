@@ -4,12 +4,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from interview_bot.api import router
 from interview_bot.config import Settings, get_settings
 from interview_bot.explainer import Explainer
 from interview_bot.interviewer import Interviewer
-from interview_bot.llm import MODEL_PROVIDERS, LLMClient, LLMError, build_llm_clients
+from interview_bot.llm import LLMClient, LLMError, build_llm_clients
 from interview_bot.store import SessionStore, build_session_store
 
 
@@ -25,7 +26,7 @@ def create_app(
         # An injected client stands in for every provider, so a test can pick
         # any of them and still be talking to the one it set up.
         app.state.llm_clients = (
-            {provider: llm_client for provider in MODEL_PROVIDERS}
+            {provider: llm_client for provider in settings.model_providers}
             if llm_client
             else build_llm_clients(settings)
         )
@@ -69,6 +70,9 @@ def create_app(
         )
 
     app.include_router(router)
+    if settings.static_dir is not None:
+        # Mounted last, so the API routes are matched before the catch-all.
+        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="frontend")
     return app
 
 

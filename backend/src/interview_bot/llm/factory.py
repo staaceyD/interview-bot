@@ -1,14 +1,8 @@
-from typing import get_args
-
 from interview_bot.config import ModelProvider, Settings
 from interview_bot.llm.anthropic import AnthropicClient
 from interview_bot.llm.base import LLMClient
 from interview_bot.llm.echo import EchoClient
 from interview_bot.llm.ollama import OllamaClient
-
-# Every provider an interview can run on, taken from the type so that adding
-# one in one place is enough.
-MODEL_PROVIDERS: tuple[ModelProvider, ...] = get_args(ModelProvider)
 
 
 def build_llm_client(settings: Settings, model_provider: ModelProvider | None = None) -> LLMClient:
@@ -37,4 +31,4 @@ def build_llm_clients(settings: Settings) -> dict[str, LLMClient]:
     until it is asked for a completion: an Anthropic client with no key costs
     nothing until a session actually picks it.
     """
-    return {provider: build_llm_client(settings, provider) for provider in MODEL_PROVIDERS}
+    return {provider: build_llm_client(settings, provider) for provider in settings.model_providers}

@@ -1,15 +1,21 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ModelProvider = Literal["ollama", "anthropic", "echo"]
 StoreBackend = Literal["sqlite", "memory"]
+Environment = Literal["development", "production"]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="INTERVIEW_BOT_", env_file=".env")
+
+    # Production is the hosted deployment, where there is no Ollama next to the
+    # server: it runs on Claude alone and offers nothing to switch to.
+    environment: Environment = "development"
 
     # The provider a session runs on when it does not choose one itself.
     default_model_provider: ModelProvider = "ollama"
@@ -34,6 +40,22 @@ class Settings(BaseSettings):
     sqlite_path: Path = Path("interview_bot.db")
 
     cors_origins: list[str] = ["http://localhost:5173"]
+    # The built frontend, served by the API itself when set, so a deployment is
+    # one service on one origin.
+    static_dir: Path | None = None
+
+    @model_validator(mode="after")
+    def _claude_in_production(self) -> "Settings":
+        if self.environment == "production":
+            self.default_model_provider = "anthropic"
+        return self
+
+    @property
+    def model_providers(self) -> tuple[ModelProvider, ...]:
+        """Every provider an interview can run on in this environment."""
+        if self.environment == "production":
+            return ("anthropic",)
+        return get_args(ModelProvider)
 
 
 @lru_cache
