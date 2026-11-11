@@ -1,5 +1,4 @@
 # Render Blueprint for the hosted deployment, on the free plan.
-# https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: interview-bot
@@ -7,7 +6,6 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    # Deployed only by hand, from .github/workflows/deploy.yml, never on a push.
     autoDeployTrigger: "off"
     envVars:
       # The free disk does not survive a restart, so everything lives in Postgres.
