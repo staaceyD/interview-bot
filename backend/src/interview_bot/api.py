@@ -45,7 +45,8 @@ def _interviewer_for(model_provider: str, interviewers: Mapping[str, Interviewer
     """The interviewer running one named model."""
     interviewer = interviewers.get(model_provider)
     if interviewer is None:
-        # Only reachable from a session stored before a provider was removed.
+        # A provider this environment does not run, or one a stored session
+        # was on before it was removed.
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             f"The {model_provider} model is not configured",
@@ -86,12 +87,19 @@ async def health(clients: LLMClientsDep, settings: SettingsDep) -> HealthRespons
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 async def start_session(
-    body: StartSessionRequest, store: SessionStoreDep, settings: SettingsDep
+    body: StartSessionRequest,
+    store: SessionStoreDep,
+    interviewers: InterviewersDep,
+    settings: SettingsDep,
 ) -> SessionResponse:
+    model_provider = body.model_provider or settings.default_model_provider
+    # Refused up front, so an interview never starts on a model this deployment
+    # does not run.
+    _interviewer_for(model_provider, interviewers)
     session = await store.create(
         topics=body.topics,
         difficulty=body.difficulty,
-        model_provider=body.model_provider or settings.default_model_provider,
+        model_provider=model_provider,
     )
     return _as_session(session)
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api as defaultApi, ApiError } from "./api/client";
 import type { Api } from "./api/client";
+import { isHosted } from "./api/types";
 import type { Difficulty, Explanation, Grade, Question, Topic } from "./api/types";
 import { GradeCard } from "./components/GradeCard";
 import { ModelPicker } from "./components/ModelPicker";
@@ -24,7 +25,10 @@ export function App({ api = defaultApi }: { api?: Api }) {
   const [topics, setTopics] = useState<Topic[]>(["python"]);
   const [difficulty, setDifficulty] = useState<Difficulty>("mid");
   // The local model to begin with: nothing is spent until this is changed.
-  const [modelProvider, setModelProvider] = useState<string>("ollama");
+  // Hosted, Claude is the only model there is.
+  const [modelProvider, setModelProvider] = useState<string>(() =>
+    isHosted() ? "anthropic" : "ollama",
+  );
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
   const [grade, setGrade] = useState<Grade | null>(null);
@@ -201,7 +205,9 @@ export function App({ api = defaultApi }: { api?: Api }) {
         </div>
       ) : (
         <div role="tabpanel" id="panel-interview" aria-labelledby="tab-interview">
-          <ModelPicker modelProvider={modelProvider} disabled={busy} onChange={chooseModel} />
+          {!isHosted() && (
+            <ModelPicker modelProvider={modelProvider} disabled={busy} onChange={chooseModel} />
+          )}
 
           {sessionId === null ? (
             <TopicPicker

@@ -64,3 +64,13 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # The image the deploy runs, built so a broken Dockerfile fails here rather
+  # than on Render.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build
+        run: docker build .

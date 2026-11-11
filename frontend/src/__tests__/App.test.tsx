@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
 import { ApiError } from "../api/client";
@@ -653,5 +653,27 @@ describe("the model picker", () => {
     await screen.findByText(question.prompt);
 
     expect(screen.getByLabelText(/model/i)).toHaveValue("anthropic");
+  });
+});
+
+describe("the hosted build", () => {
+  beforeEach(() => vi.stubEnv("VITE_APP_ENV", "production"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("offers no model to switch to", () => {
+    render(<App api={fakeApi()} />);
+
+    expect(screen.queryByLabelText(/model/i)).not.toBeInTheDocument();
+  });
+
+  it("starts the interview on Claude", async () => {
+    const api = fakeApi();
+    const user = userEvent.setup();
+    render(<App api={api} />);
+
+    await user.click(screen.getByRole("button", { name: /start interview/i }));
+    await screen.findByText(question.prompt);
+
+    expect(api.startSession).toHaveBeenCalledWith(["python"], "mid", "anthropic");
   });
 });

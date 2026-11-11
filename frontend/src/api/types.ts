@@ -51,6 +51,10 @@ export const MODEL_PROVIDERS = [
 
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number]["value"];
 
+// The hosted build runs on Claude alone: there is no Ollama next to the server,
+// so there is nothing to pick between. Read when called, so a test can stub it.
+export const isHosted = () => import.meta.env.VITE_APP_ENV === "production";
+
 export const DIFFICULTIES = ["junior", "mid", "senior"] as const;
 
 export type Difficulty = (typeof DIFFICULTIES)[number];
