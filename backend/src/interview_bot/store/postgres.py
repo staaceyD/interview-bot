@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 import psycopg
 from psycopg.rows import TupleRow
@@ -14,7 +15,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- A JSON array: an interview can draw on several topics at once.
     topics         TEXT NOT NULL,
     difficulty     TEXT NOT NULL,
-    model_provider TEXT NOT NULL DEFAULT '{DEFAULT_MODEL_PROVIDER}'
+    model_provider TEXT NOT NULL DEFAULT '{DEFAULT_MODEL_PROVIDER}',
+    owner_id       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS questions (
@@ -44,6 +46,14 @@ CREATE TABLE IF NOT EXISTS explanations (
 );
 
 CREATE INDEX IF NOT EXISTS explanations_by_session ON explanations(session_id);
+
+-- Questions asked per user per day, for the daily limits.
+CREATE TABLE IF NOT EXISTS usage (
+    user_id   TEXT NOT NULL,
+    day       DATE NOT NULL,
+    questions INTEGER NOT NULL,
+    PRIMARY KEY (user_id, day)
+);
 """
 
 
@@ -82,22 +92,25 @@ class PostgresSessionStore:
         topics: list[Topic],
         difficulty: Difficulty,
         model_provider: str = DEFAULT_MODEL_PROVIDER,
+        owner_id: str | None = None,
     ) -> Session:
         session = Session(
             id=new_session_id(),
             topics=list(topics),
             difficulty=difficulty,
             model_provider=model_provider,
+            owner_id=owner_id,
         )
         async with self._pool.connection() as conn:
             await conn.execute(
-                "INSERT INTO sessions (id, topics, difficulty, model_provider)"
-                " VALUES (%s, %s, %s, %s)",
+                "INSERT INTO sessions (id, topics, difficulty, model_provider, owner_id)"
+                " VALUES (%s, %s, %s, %s, %s)",
                 (
                     session.id,
                     json.dumps([topic.value for topic in session.topics]),
                     session.difficulty.value,
                     session.model_provider,
+                    session.owner_id,
                 ),
             )
         return session
@@ -112,7 +125,7 @@ class PostgresSessionStore:
     async def get(self, session_id: str) -> Session | None:
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
-                "SELECT topics, difficulty, model_provider FROM sessions WHERE id = %s",
+                "SELECT topics, difficulty, model_provider, owner_id FROM sessions WHERE id = %s",
                 (session_id,),
             )
             row = await cursor.fetchone()
@@ -124,6 +137,7 @@ class PostgresSessionStore:
                 topics=[Topic(topic) for topic in json.loads(row[0])],
                 difficulty=Difficulty(row[1]),
                 model_provider=row[2],
+                owner_id=row[3],
             )
             cursor = await conn.execute(
                 "SELECT id, topic, difficulty, prompt, key_points"
@@ -180,6 +194,37 @@ class PostgresSessionStore:
                 " ON CONFLICT (question_id) DO UPDATE SET payload = excluded.payload",
                 (question_id, session_id, explanation.model_dump_json()),
             )
+
+    async def take_question(self, *, user_id: str, day: date, limit: int) -> bool:
+        if limit <= 0:
+            return False
+        async with self._pool.connection() as conn:
+            # One statement, so concurrent requests cannot all pass the check
+            # before any of them is counted.
+            cursor = await conn.execute(
+                "INSERT INTO usage (user_id, day, questions) VALUES (%s, %s, 1)"
+                " ON CONFLICT (user_id, day) DO UPDATE SET questions = usage.questions + 1"
+                " WHERE usage.questions < %s"
+                " RETURNING questions",
+                (user_id, day, limit),
+            )
+            return await cursor.fetchone() is not None
+
+    async def give_back_question(self, *, user_id: str, day: date) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                "UPDATE usage SET questions = questions - 1"
+                " WHERE user_id = %s AND day = %s AND questions > 0",
+                (user_id, day),
+            )
+
+    async def questions_taken(self, *, user_id: str, day: date) -> int:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT questions FROM usage WHERE user_id = %s AND day = %s", (user_id, day)
+            )
+            row = await cursor.fetchone()
+        return row[0] if row else 0
 
     async def aclose(self) -> None:
         await self._pool.close()

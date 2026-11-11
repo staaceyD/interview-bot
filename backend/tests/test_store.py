@@ -1,7 +1,9 @@
 """The contract every SessionStore must satisfy, run against each implementation."""
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
+from datetime import date
 
 import psycopg
 import pytest
@@ -232,3 +234,60 @@ async def test_switching_model_is_stored(store: SessionStore) -> None:
     await store.set_model_provider(session.id, "anthropic")
 
     assert (await store.get(session.id)).model_provider == "anthropic"
+
+
+async def test_a_session_remembers_who_it_belongs_to(store: SessionStore) -> None:
+    mine = await store.create(topics=[Topic.PYTHON], difficulty=Difficulty.MID, owner_id="github:1")
+    nobodys = await store.create(topics=[Topic.PYTHON], difficulty=Difficulty.MID)
+
+    loaded_mine = await store.get(mine.id)
+    loaded_nobodys = await store.get(nobodys.id)
+
+    assert loaded_mine is not None and loaded_mine.owner_id == "github:1"
+    assert loaded_nobodys is not None and loaded_nobodys.owner_id is None
+
+
+TODAY = date(2026, 11, 11)
+
+
+async def test_questions_are_counted_up_to_the_limit(store: SessionStore) -> None:
+    taken = [await store.take_question(user_id="u", day=TODAY, limit=2) for _ in range(3)]
+
+    assert taken == [True, True, False]
+    assert await store.questions_taken(user_id="u", day=TODAY) == 2
+
+
+async def test_questions_are_counted_per_user_and_per_day(store: SessionStore) -> None:
+    await store.take_question(user_id="u", day=TODAY, limit=1)
+
+    assert await store.take_question(user_id="v", day=TODAY, limit=1)
+    assert await store.take_question(user_id="u", day=date(2026, 11, 12), limit=1)
+    assert await store.questions_taken(user_id="nobody", day=TODAY) == 0
+
+
+async def test_a_limit_of_nothing_counts_nothing(store: SessionStore) -> None:
+    assert not await store.take_question(user_id="u", day=TODAY, limit=0)
+    assert await store.questions_taken(user_id="u", day=TODAY) == 0
+
+
+async def test_a_question_given_back_can_be_taken_again(store: SessionStore) -> None:
+    await store.take_question(user_id="u", day=TODAY, limit=1)
+
+    await store.give_back_question(user_id="u", day=TODAY)
+
+    assert await store.take_question(user_id="u", day=TODAY, limit=1)
+
+
+async def test_giving_back_never_goes_below_nothing(store: SessionStore) -> None:
+    await store.give_back_question(user_id="u", day=TODAY)
+
+    assert await store.questions_taken(user_id="u", day=TODAY) == 0
+
+
+async def test_concurrent_takes_never_pass_the_limit(store: SessionStore) -> None:
+    taken = await asyncio.gather(
+        *(store.take_question(user_id="u", day=TODAY, limit=3) for _ in range(20))
+    )
+
+    assert taken.count(True) == 3
+    assert await store.questions_taken(user_id="u", day=TODAY) == 3

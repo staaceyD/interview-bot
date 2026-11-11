@@ -26,5 +26,6 @@ COPY --from=frontend /app/frontend/dist /app/frontend/dist
 ENV PATH="/app/backend/.venv/bin:$PATH" \
     INTERVIEW_BOT_ENVIRONMENT=production \
     INTERVIEW_BOT_STATIC_DIR=/app/frontend/dist
-# The host says which port to listen on.
-CMD ["sh", "-c", "uvicorn interview_bot.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# The host says which port to listen on. Its proxy ends TLS, so the forwarded
+# headers are trusted: the sign-in callback URL has to come out as https.
+CMD ["sh", "-c", "uvicorn interview_bot.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

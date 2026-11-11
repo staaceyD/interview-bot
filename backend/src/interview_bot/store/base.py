@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Protocol
 from uuid import uuid4
 
@@ -17,6 +18,9 @@ class Session:
     # comes back on the model it was running on, and so switching model is a
     # change to the interview rather than to the whole app.
     model_provider: str = DEFAULT_MODEL_PROVIDER
+    # The signed-in visitor the interview belongs to, who alone may see or
+    # continue it. None where nobody signs in, as when running locally.
+    owner_id: str | None = None
     questions: dict[str, Question] = field(default_factory=dict)
     grades: dict[str, Grade] = field(default_factory=dict)
     explanations: dict[str, Explanation] = field(default_factory=dict)
@@ -59,6 +63,10 @@ def new_session_id() -> str:
     return str(uuid4())
 
 
+# The usage row every visitor's questions are also counted against.
+ALL_USERS = "*"
+
+
 class SessionStore(Protocol):
     """Async so a database-backed store can replace the in-memory one."""
 
@@ -70,6 +78,7 @@ class SessionStore(Protocol):
         topics: list[Topic],
         difficulty: Difficulty,
         model_provider: str = DEFAULT_MODEL_PROVIDER,
+        owner_id: str | None = None,
     ) -> Session: ...
 
     async def get(self, session_id: str) -> Session | None: ...
@@ -83,5 +92,19 @@ class SessionStore(Protocol):
     async def record_explanation(
         self, session_id: str, question_id: str, explanation: Explanation
     ) -> None: ...
+
+    async def take_question(self, *, user_id: str, day: date, limit: int) -> bool:
+        """Count one more question for a user and day, unless they are at `limit`.
+
+        Checked and counted in one step, so requests fired at once cannot all
+        slip in under the limit together. True if the question was counted.
+        """
+        ...
+
+    async def give_back_question(self, *, user_id: str, day: date) -> None:
+        """Uncount a question that was counted but never asked."""
+        ...
+
+    async def questions_taken(self, *, user_id: str, day: date) -> int: ...
 
     async def aclose(self) -> None: ...

@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ModelProvider = Literal["ollama", "anthropic", "echo"]
 StoreBackend = Literal["sqlite", "memory", "postgres"]
+SignInProvider = Literal["google", "github"]
 Environment = Literal["development", "production"]
 
 # Where `neon deploy` writes the Neon branch's variables: the repository root.
@@ -25,7 +26,8 @@ class Settings(BaseSettings):
     )
 
     # Production is the hosted deployment, where there is no Ollama next to the
-    # server: it runs on Claude alone and offers nothing to switch to.
+    # server: it runs on Claude alone and offers nothing to switch to, and an
+    # interview needs a signed-in visitor with questions left for the day.
     environment: Environment = "development"
 
     # The provider a session runs on when it does not choose one itself.
@@ -65,16 +67,53 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Signs the cookie a visitor stays signed in with. Required in production:
+    # without it nobody could sign in, and a default would let anyone forge one.
+    session_secret: SecretStr | None = None
+    session_max_age_seconds: int = 14 * 24 * 60 * 60
+    # A provider is offered on the sign-in screen once both halves are set.
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    github_client_id: str | None = None
+    github_client_secret: SecretStr | None = None
+
+    # Questions are what cost money, so they are what is counted: a grade and a
+    # worked answer come with the question they are for. Each signed-in visitor
+    # gets this many a day (UTC)...
+    daily_question_limit: int = 20
+    # ...and all of them together this many, so no number of accounts can run
+    # up more than a fixed bill.
+    daily_question_limit_total: int = 200
+    # Verified emails that are never counted: the owner's.
+    unlimited_emails: list[str] = []
+
     cors_origins: list[str] = ["http://localhost:5173"]
     # The built frontend, served by the API itself when set, so a deployment is
     # one service on one origin.
     static_dir: Path | None = None
 
     @model_validator(mode="after")
-    def _claude_in_production(self) -> "Settings":
+    def _production(self) -> "Settings":
         if self.environment == "production":
             self.default_model_provider = "anthropic"
+            if self.session_secret is None:
+                raise ValueError("INTERVIEW_BOT_SESSION_SECRET is required in production")
         return self
+
+    @property
+    def sign_in_required(self) -> bool:
+        """Whether an interview needs a signed-in visitor, and is counted against them."""
+        return self.environment == "production"
+
+    @property
+    def sign_in_providers(self) -> list[SignInProvider]:
+        """The providers with both an id and a secret, in the order they are offered."""
+        configured: list[SignInProvider] = []
+        if self.google_client_id and self.google_client_secret:
+            configured.append("google")
+        if self.github_client_id and self.github_client_secret:
+            configured.append("github")
+        return configured
 
     @property
     def model_providers(self) -> tuple[ModelProvider, ...]:
