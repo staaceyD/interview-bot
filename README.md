@@ -173,9 +173,9 @@ One-time setup:
 3. In GitHub, **Settings → Secrets and variables → Actions**, add it as
    `RENDER_DEPLOY_HOOK_URL`.
 
-From then on, every push to `main` deploys once CI has passed
-(`.github/workflows/deploy.yml`). **Actions → Deploy → Run workflow** deploys by
-hand.
+Deploys happen only by hand: **Actions → Deploy → Run workflow**, on `main`
+(`.github/workflows/deploy.yml`). It runs the full CI suite again first, and
+deploys only if it passes. Merging to `main` deploys nothing.
 
 On the free plan the service sleeps after 15 minutes without a visit, and the
 first request after that takes about a minute to wake it. Its disk does not

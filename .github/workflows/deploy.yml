@@ -1,11 +1,8 @@
 name: Deploy
 
-# Runs after CI finishes on main, and deploys only if it passed.
+# Only ever by hand: Actions → Deploy → Run workflow. Merging to main does not
+# deploy anything.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -13,11 +10,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ci:
+    # The deploy hook deploys main, so main is the only branch it runs from.
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
   deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push')
+    needs: ci
     runs-on: ubuntu-latest
     environment: production
     steps:
