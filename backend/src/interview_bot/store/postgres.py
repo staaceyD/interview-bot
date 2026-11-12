@@ -46,6 +46,10 @@ CREATE TABLE IF NOT EXISTS explanations (
 
 CREATE INDEX IF NOT EXISTS explanations_by_session ON explanations(session_id);
 
+CREATE TABLE IF NOT EXISTS grade_claims (
+    question_id TEXT PRIMARY KEY REFERENCES questions(id) ON DELETE CASCADE
+);
+
 -- Questions asked per user per day, for the daily limits.
 CREATE TABLE IF NOT EXISTS usage (
     user_id   TEXT NOT NULL,
@@ -193,6 +197,19 @@ class PostgresSessionStore:
                 " ON CONFLICT (question_id) DO UPDATE SET payload = excluded.payload",
                 (question_id, session_id, explanation.model_dump_json()),
             )
+
+    async def claim_grade(self, question_id: str) -> bool:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                "INSERT INTO grade_claims (question_id) VALUES (%s)"
+                " ON CONFLICT DO NOTHING RETURNING question_id",
+                (question_id,),
+            )
+            return await cursor.fetchone() is not None
+
+    async def release_grade(self, question_id: str) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute("DELETE FROM grade_claims WHERE question_id = %s", (question_id,))
 
     async def take_question(self, *, user_id: str, day: date, limit: int) -> bool:
         if limit <= 0:

@@ -93,6 +93,17 @@ class SessionStore(Protocol):
         self, session_id: str, question_id: str, explanation: Explanation
     ) -> None: ...
 
+    async def claim_grade(self, question_id: str) -> bool:
+        """Reserve a question's one grade; False if another request already holds it.
+
+        Claimed in one step, so answers sent at once cannot all be graded.
+        """
+        ...
+
+    async def release_grade(self, question_id: str) -> None:
+        """Free a claim whose grading failed, so the question can be answered again."""
+        ...
+
     async def take_question(self, *, user_id: str, day: date, limit: int) -> bool:
         """Count one more question for a user and day, unless they are at `limit`.
 
