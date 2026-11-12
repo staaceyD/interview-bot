@@ -17,36 +17,22 @@ NEON_ENV_FILE = Path(__file__).resolve().parents[3] / ".env.local"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="INTERVIEW_BOT_",
-        # Later files win: a .env of your own overrides what Neon wrote.
         env_file=(NEON_ENV_FILE, ".env.local", ".env"),
-        # The Neon file carries variables this app has no use for.
         extra="ignore",
-        # So a test can still pass database_url=... by name.
         populate_by_name=True,
     )
 
-    # Production is the hosted deployment, where there is no Ollama next to the
-    # server: it runs on Claude alone and offers nothing to switch to, and an
-    # interview needs a signed-in visitor with questions left for the day.
     environment: Environment = "development"
 
-    # The provider a session runs on when it does not choose one itself.
     default_model_provider: ModelProvider = "ollama"
     llm_timeout_seconds: float = 120.0
-    # A worked answer is several times longer than a question or a grade, so it
-    # gets its own budget rather than making a hung model take five minutes to
-    # fail on every call.
     llm_explain_timeout_seconds: float = 300.0
     prefetch_explanations: bool = True
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:4b-instruct"
 
-    # The cheapest Claude model, and still several times faster than a 4B model
-    # on a laptop. The key comes from the environment: ANTHROPIC_API_KEY, or a
-    # profile left by `ant auth login`.
     anthropic_model: str = "claude-haiku-4-5"
-    # A worked answer is the longest reply and runs to about 1,300 tokens.
     anthropic_max_tokens: int = 4096
 
     store_backend: StoreBackend = "sqlite"
@@ -59,7 +45,6 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("INTERVIEW_BOT_DATABASE_URL", "DATABASE_URL"),
     )
-    # Direct: creating the schema, which the pooler is not for.
     database_url_unpooled: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices(
@@ -67,29 +52,19 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Signs the cookie a visitor stays signed in with. Required in production:
-    # without it nobody could sign in, and a default would let anyone forge one.
     session_secret: SecretStr | None = None
     session_max_age_seconds: int = 14 * 24 * 60 * 60
-    # A provider is offered on the sign-in screen once both halves are set.
     google_client_id: str | None = None
     google_client_secret: SecretStr | None = None
     github_client_id: str | None = None
     github_client_secret: SecretStr | None = None
 
-    # Questions are what cost money, so they are what is counted: a grade and a
-    # worked answer come with the question they are for. Each signed-in visitor
-    # gets this many a day (UTC)...
-    daily_question_limit: int = 20
-    # ...and all of them together this many, so no number of accounts can run
-    # up more than a fixed bill.
-    daily_question_limit_total: int = 200
-    # Verified emails that are never counted: the owner's.
+
+    daily_question_limit: int = 5
+    daily_question_limit_total: int = 20
     unlimited_emails: list[str] = []
 
     cors_origins: list[str] = ["http://localhost:5173"]
-    # The built frontend, served by the API itself when set, so a deployment is
-    # one service on one origin.
     static_dir: Path | None = None
 
     @model_validator(mode="after")

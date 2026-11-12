@@ -58,21 +58,16 @@ def create_app(
             yield
         finally:
             await app.state.explainer.aclose()
-            # dict.fromkeys drops the duplicates an injected client leaves behind.
             for client in dict.fromkeys(app.state.llm_clients.values()):
                 await client.aclose()
             await app.state.session_store.aclose()
 
     app = FastAPI(title="Interview Bot", version="0.1.0", lifespan=lifespan)
-    # Read back by the request handlers, so they see the settings this app was
-    # built with rather than the process-wide ones.
     app.state.settings = settings
     app.state.identity_providers = (
         identity_providers if identity_providers is not None else build_identity_providers(settings)
     )
-    # The signed, httpOnly cookie a visitor stays signed in with. Production
-    # refuses to start without a secret; a local run gets one of its own, and
-    # signs everybody out when it restarts.
+
     app.add_middleware(
         SessionMiddleware,
         secret_key=(
@@ -104,7 +99,6 @@ def create_app(
     app.include_router(router)
     app.include_router(auth_router)
     if settings.static_dir is not None:
-        # Mounted last, so the API routes are matched before the catch-all.
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="frontend")
     return app
 

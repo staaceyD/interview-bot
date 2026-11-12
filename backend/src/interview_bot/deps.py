@@ -56,7 +56,5 @@ SessionStoreDep = Annotated[SessionStore, Depends(get_session_store)]
 ExplainerDep = Annotated[Explainer, Depends(get_explainer)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 QuotaDep = Annotated[Quota, Depends(get_quota)]
-# Signed in or not, for the endpoints anyone may call.
 SignedInUserDep = Annotated[User | None, Depends(get_signed_in_user)]
-# Refused with a 401 where sign-in is required.
 ViewerDep = Annotated[User | None, Depends(get_viewer)]

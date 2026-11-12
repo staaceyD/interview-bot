@@ -23,8 +23,6 @@ class User:
     # Namespaced by provider, so a Google and a GitHub account never collide.
     id: str
     name: str
-    # Verified by the provider, or None: an unverified address proves nothing,
-    # and is never matched against the unlimited list.
     email: str | None
 
 
@@ -59,8 +57,6 @@ class GoogleProvider:
 
     async def identify(self, request: Request) -> User:
         try:
-            # Checks the state against the one stored at login, and the ID
-            # token's signature, issuer, audience and nonce.
             token = await self._client.authorize_access_token(request)
         except OAuthError as exc:
             raise SignInFailed(str(exc)) from exc
@@ -145,7 +141,6 @@ def current_user(request: Request) -> User | None:
     try:
         return User(**stored)
     except TypeError:
-        # A cookie from a version that kept different fields: signed out.
         return None
 
 
@@ -172,9 +167,7 @@ async def callback(provider: str, request: Request) -> Response:
     try:
         user = await chosen.identify(request)
     except SignInFailed:
-        # Back to the app, signed out, rather than a JSON error page mid-redirect.
         return RedirectResponse("/?sign_in=failed", status_code=status.HTTP_303_SEE_OTHER)
-    # A fresh session on sign-in, so nothing set before it carries across.
     request.session.clear()
     request.session[SESSION_USER] = asdict(user)
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)

@@ -183,54 +183,8 @@ Running locally, none of them apply.
   so a burst of requests cannot slip past the limit, and is given back if Claude
   fails. Each question is graded once. The limits reset at midnight UTC.
 
-As a last line of defence, give the deployment a key from its own
-[Anthropic workspace](https://console.anthropic.com/settings/workspaces) with a
-monthly spend limit, so the most it can ever cost is a number you chose.
-
-### One-time setup
-
-1. **Database.** The repository is linked to a Neon project (`.neon`, `neon.ts`).
-   `neon deploy` writes the `production` branch's connection strings to
-   `.env.local` at the repository root, which git and Docker both ignore. The
-   backend reads them from there as `DATABASE_URL` (pooled) and
-   `DATABASE_URL_UNPOOLED` (direct), but only uses them with
-   `INTERVIEW_BOT_STORE_BACKEND=postgres` — a local run stays on SQLite, and
-   never touches production by accident.
-2. **Google sign-in.** In the
-   [Google Cloud console](https://console.cloud.google.com/apis/credentials),
-   create an OAuth client ID of type *Web application*, with the redirect URI
-   `https://<your-app>.onrender.com/auth/google/callback`.
-3. **GitHub sign-in.** In
-   [GitHub → Settings → Developer settings → OAuth Apps](https://github.com/settings/developers),
-   create an app with the callback URL
-   `https://<your-app>.onrender.com/auth/github/callback`.
-4. **Claude.** Create a workspace with a spend limit in the Anthropic console,
-   and an API key in it.
-5. **Render.** **New → Blueprint**, and pick this repository. It reads
-   `render.yaml`, generates the cookie secret itself, and asks for the rest:
-
-   | Variable | Value |
-   |---|---|
-   | `DATABASE_URL` | `DATABASE_URL` from `.env.local` |
-   | `DATABASE_URL_UNPOOLED` | `DATABASE_URL_UNPOOLED` from `.env.local` |
-   | `ANTHROPIC_API_KEY` | The workspace's key |
-   | `INTERVIEW_BOT_GOOGLE_CLIENT_ID` / `_SECRET` | From step 2 |
-   | `INTERVIEW_BOT_GITHUB_CLIENT_ID` / `_SECRET` | From step 3 |
-   | `INTERVIEW_BOT_UNLIMITED_EMAILS` | A JSON list, e.g. `["you@example.com"]` |
-
-   A provider whose id and secret are not both set is simply not offered.
-6. **Deploys.** In the service's **Settings → Deploy Hook**, copy the URL, and
-   add it in GitHub (**Settings → Secrets and variables → Actions**) as
-   `RENDER_DEPLOY_HOOK_URL`.
-
-The `<your-app>.onrender.com` address is shown once the service is created; if
-it differs from what you put in steps 2 and 3, update the redirect URIs there.
-
-### Deploying
-
-Only by hand: **Actions → Deploy → Run workflow**, on `main`. It runs the full
-CI suite again first, and deploys only if it passes. Merging to `main` deploys
-nothing.
+Deploys are manual: the Deploy workflow runs the full CI suite again, and only
+then triggers the deploy on Render. Merging to `main` deploys nothing.
 
 On the free plan the service sleeps after 15 minutes without a visit, and the
 first request after that takes about a minute to wake it.
