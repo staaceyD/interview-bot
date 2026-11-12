@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import aiosqlite
@@ -12,7 +13,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- A JSON array: an interview can draw on several topics at once.
     topics     TEXT NOT NULL,
     difficulty TEXT NOT NULL,
-    model_provider    TEXT NOT NULL DEFAULT '{DEFAULT_MODEL_PROVIDER}'
+    model_provider    TEXT NOT NULL DEFAULT '{DEFAULT_MODEL_PROVIDER}',
+    owner_id   TEXT
 );
 
 CREATE TABLE IF NOT EXISTS questions (
@@ -42,6 +44,14 @@ CREATE TABLE IF NOT EXISTS explanations (
 );
 
 CREATE INDEX IF NOT EXISTS explanations_by_session ON explanations(session_id);
+
+-- Questions asked per user per day, for the daily limits.
+CREATE TABLE IF NOT EXISTS usage (
+    user_id   TEXT NOT NULL,
+    day       TEXT NOT NULL,
+    questions INTEGER NOT NULL,
+    PRIMARY KEY (user_id, day)
+);
 """
 
 
@@ -76,6 +86,8 @@ class SQLiteSessionStore:
 
         await self._migrate_model_provider(columns)
         await self._migrate_topics(columns)
+        if "owner_id" not in columns:
+            await db.execute("ALTER TABLE sessions ADD COLUMN owner_id TEXT")
 
     async def _migrate_model_provider(self, columns: set[str]) -> None:
         db = self._connection()
@@ -106,20 +118,24 @@ class SQLiteSessionStore:
         topics: list[Topic],
         difficulty: Difficulty,
         model_provider: str = DEFAULT_MODEL_PROVIDER,
+        owner_id: str | None = None,
     ) -> Session:
         session = Session(
             id=new_session_id(),
             topics=list(topics),
             difficulty=difficulty,
             model_provider=model_provider,
+            owner_id=owner_id,
         )
         await self._connection().execute(
-            "INSERT INTO sessions (id, topics, difficulty, model_provider) VALUES (?, ?, ?, ?)",
+            "INSERT INTO sessions (id, topics, difficulty, model_provider, owner_id)"
+            " VALUES (?, ?, ?, ?, ?)",
             (
                 session.id,
                 json.dumps([topic.value for topic in session.topics]),
                 session.difficulty.value,
                 session.model_provider,
+                session.owner_id,
             ),
         )
         await self._connection().commit()
@@ -134,7 +150,8 @@ class SQLiteSessionStore:
     async def get(self, session_id: str) -> Session | None:
         db = self._connection()
         async with db.execute(
-            "SELECT topics, difficulty, model_provider FROM sessions WHERE id = ?", (session_id,)
+            "SELECT topics, difficulty, model_provider, owner_id FROM sessions WHERE id = ?",
+            (session_id,),
         ) as cursor:
             row = await cursor.fetchone()
         if row is None:
@@ -145,6 +162,7 @@ class SQLiteSessionStore:
             topics=[Topic(topic) for topic in json.loads(row[0])],
             difficulty=Difficulty(row[1]),
             model_provider=row[2],
+            owner_id=row[3],
         )
         async with db.execute(
             "SELECT id, topic, difficulty, prompt, key_points"
@@ -205,6 +223,39 @@ class SQLiteSessionStore:
             (question_id, session_id, explanation.model_dump_json()),
         )
         await self._connection().commit()
+
+    async def take_question(self, *, user_id: str, day: date, limit: int) -> bool:
+        if limit <= 0:
+            return False
+        db = self._connection()
+        # The upsert only counts while under the limit, and returns no row when
+        # it does not, so the check and the count are one statement.
+        async with db.execute(
+            "INSERT INTO usage (user_id, day, questions) VALUES (?, ?, 1)"
+            " ON CONFLICT (user_id, day) DO UPDATE SET questions = questions + 1"
+            " WHERE usage.questions < ?"
+            " RETURNING questions",
+            (user_id, day.isoformat(), limit),
+        ) as cursor:
+            counted = await cursor.fetchone()
+        await db.commit()
+        return counted is not None
+
+    async def give_back_question(self, *, user_id: str, day: date) -> None:
+        await self._connection().execute(
+            "UPDATE usage SET questions = questions - 1"
+            " WHERE user_id = ? AND day = ? AND questions > 0",
+            (user_id, day.isoformat()),
+        )
+        await self._connection().commit()
+
+    async def questions_taken(self, *, user_id: str, day: date) -> int:
+        async with self._connection().execute(
+            "SELECT questions FROM usage WHERE user_id = ? AND day = ?",
+            (user_id, day.isoformat()),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return row[0] if row else 0
 
     async def aclose(self) -> None:
         if self._db is not None:

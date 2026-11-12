@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field
 
-from interview_bot.config import ModelProvider
+from interview_bot.config import ModelProvider, SignInProvider
 from interview_bot.domain import Difficulty, Explanation, Grade, Topic
 
 
@@ -80,3 +80,18 @@ class HealthResponse(BaseModel):
     status: str
     llm: LLMInfo
     available: list[LLMInfo]
+
+
+class UserResponse(BaseModel):
+    name: str
+    email: str | None
+
+
+class AccountResponse(BaseModel):
+    sign_in_required: bool
+    # The providers to offer buttons for, in order.
+    providers: list[SignInProvider]
+    user: UserResponse | None
+    # None when the visitor is not counted: signed out, unlimited, or running
+    # somewhere sign-in is not required.
+    questions_left: int | None

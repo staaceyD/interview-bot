@@ -157,22 +157,34 @@ Both suites run on every pull request via GitHub Actions.
 
 The hosted version runs on [Render](https://render.com)'s free plan, as one
 service: the `Dockerfile` builds the frontend and the API serves it, so there is
-one URL and nothing to configure for CORS.
+one URL and nothing to configure for CORS. Interviews are kept in a free
+[Neon](https://neon.tech) Postgres database, since Render's free disk does not
+survive a restart.
 
-Interviews are kept in [Neon](https://neon.tech) Postgres, on its free plan,
-because Render's free disk does not survive a restart. The repository is linked
-to the Neon project (`.neon`, `neon.ts`): `neon deploy` writes the `production`
-branch's connection strings to `.env.local` at the repository root, which git
-and Docker both ignore. The backend reads them from there under Neon's own
-names — `DATABASE_URL`, pooled, for its queries, and `DATABASE_URL_UNPOOLED`,
-direct, for creating its tables — but only with
-`INTERVIEW_BOT_STORE_BACKEND=postgres`. A local run stays on SQLite, and never
-touches production by accident.
+It runs with `INTERVIEW_BOT_ENVIRONMENT=production`, which changes three things.
+Running locally, none of them apply.
 
-It runs with `INTERVIEW_BOT_ENVIRONMENT=production`, which means Claude only.
-There is no Ollama next to the server, so the **Model** dropdown is gone and
-every interview runs on Claude. Ollama stays available when you run the app
-locally, as above.
+- **Claude only.** There is no Ollama next to the server, so the **Model**
+  dropdown is gone.
+- **Sign in to start.** Anyone can look around, but an interview needs a Google
+  or GitHub account. Sign-in is OAuth 2.0 with PKCE (and OpenID Connect for
+  Google), done by [Authlib](https://docs.authlib.org/). No passwords or
+  provider tokens are stored: the visitor's id, name and verified email are kept
+  in a signed, `httpOnly`, `Secure`, `SameSite=Lax` cookie. An interview belongs
+  to whoever started it, and to anyone else it does not exist.
+- **Daily limits**, so a public URL cannot run up the bill:
+  - 20 questions a day per account (`INTERVIEW_BOT_DAILY_QUESTION_LIMIT`).
+  - 200 a day for everyone together (`INTERVIEW_BOT_DAILY_QUESTION_LIMIT_TOTAL`),
+    however many accounts are made.
+  - The emails in `INTERVIEW_BOT_UNLIMITED_EMAILS` are never counted. Only an
+    address the provider has verified counts.
+
+  A question is counted before Claude is asked, in a single database statement,
+  so a burst of requests cannot slip past the limit, and is given back if Claude
+  fails. Each question is graded once. The limits reset at midnight UTC.
+
+Deploys are manual: the Deploy workflow runs the full CI suite again, and only
+then triggers the deploy on Render. Merging to `main` deploys nothing.
 
 On the free plan the service sleeps after 15 minutes without a visit, and the
 first request after that takes about a minute to wake it.

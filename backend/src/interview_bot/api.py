@@ -2,17 +2,24 @@ from collections.abc import Mapping
 
 from fastapi import APIRouter, HTTPException, status
 
+from interview_bot.auth import User
 from interview_bot.deps import (
     ExplainerDep,
     InterviewersDep,
     LLMClientsDep,
+    QuotaDep,
     SessionStoreDep,
     SettingsDep,
+    SignedInUserDep,
+    ViewerDep,
 )
 from interview_bot.domain import Explanation, Grade, Question
 from interview_bot.interviewer import Interviewer
+from interview_bot.llm import LLMError
+from interview_bot.quota import QuotaExceeded
 from interview_bot.rotation import next_topic
 from interview_bot.schemas import (
+    AccountResponse,
     AnswerRequest,
     HealthResponse,
     LLMInfo,
@@ -21,15 +28,18 @@ from interview_bot.schemas import (
     SessionStateResponse,
     StartSessionRequest,
     SwitchModelRequest,
+    UserResponse,
 )
 from interview_bot.store import Session, SessionStore
 
 router = APIRouter()
 
 
-async def _require_session(store: SessionStore, session_id: str) -> Session:
+async def _require_session(store: SessionStore, session_id: str, viewer: User | None) -> Session:
     session = await store.get(session_id)
-    if session is None:
+    # Someone else's interview is answered exactly like one that does not
+    # exist, so a guessed id says nothing about whether it is real.
+    if session is None or session.owner_id != (viewer.id if viewer else None):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown session")
     return session
 
@@ -85,12 +95,24 @@ async def health(clients: LLMClientsDep, settings: SettingsDep) -> HealthRespons
     )
 
 
+@router.get("/auth/me")
+async def account(user: SignedInUserDep, settings: SettingsDep, quota: QuotaDep) -> AccountResponse:
+    """Who is signed in, how to sign in, and how many questions are left today."""
+    return AccountResponse(
+        sign_in_required=settings.sign_in_required,
+        providers=settings.sign_in_providers,
+        user=UserResponse(name=user.name, email=user.email) if user else None,
+        questions_left=await quota.left(user) if user and settings.sign_in_required else None,
+    )
+
+
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 async def start_session(
     body: StartSessionRequest,
     store: SessionStoreDep,
     interviewers: InterviewersDep,
     settings: SettingsDep,
+    viewer: ViewerDep,
 ) -> SessionResponse:
     model_provider = body.model_provider or settings.default_model_provider
     # Refused up front, so an interview never starts on a model this deployment
@@ -100,13 +122,16 @@ async def start_session(
         topics=body.topics,
         difficulty=body.difficulty,
         model_provider=model_provider,
+        owner_id=viewer.id if viewer else None,
     )
     return _as_session(session)
 
 
 @router.get("/sessions/{session_id}")
-async def resume_session(session_id: str, store: SessionStoreDep) -> SessionStateResponse:
-    session = await _require_session(store, session_id)
+async def resume_session(
+    session_id: str, store: SessionStoreDep, viewer: ViewerDep
+) -> SessionStateResponse:
+    session = await _require_session(store, session_id, viewer)
     current = session.latest_question
     return SessionStateResponse(
         session_id=session.id,
@@ -126,9 +151,10 @@ async def switch_model(
     store: SessionStoreDep,
     interviewers: InterviewersDep,
     explainer: ExplainerDep,
+    viewer: ViewerDep,
 ) -> SessionResponse:
     """Move an interview onto another model, from the next question onwards."""
-    session = await _require_session(store, session_id)
+    session = await _require_session(store, session_id, viewer)
     if body.model_provider == session.model_provider:
         return _as_session(session)
 
@@ -151,18 +177,36 @@ async def next_question(
     store: SessionStoreDep,
     interviewers: InterviewersDep,
     explainer: ExplainerDep,
+    quota: QuotaDep,
+    settings: SettingsDep,
+    viewer: ViewerDep,
 ) -> QuestionResponse:
-    session = await _require_session(store, session_id)
+    session = await _require_session(store, session_id, viewer)
     interviewer = _interviewer_for(session.model_provider, interviewers)
 
-    async with explainer.foreground():
-        question = await interviewer.generate_question(
-            # Shuffled across the session's topics, so a mixed interview jumps
-            # between them instead of working through one at a time.
-            topic=next_topic(session.topics, session.asked_topics),
-            difficulty=session.difficulty,
-            avoid=session.asked_prompts,
-        )
+    # Counted before the model is asked, so a burst of requests cannot all get
+    # through before the first of them is counted.
+    counted_on = None
+    if settings.sign_in_required and viewer is not None:
+        try:
+            counted_on = await quota.take(viewer)
+        except QuotaExceeded as exc:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+
+    try:
+        async with explainer.foreground():
+            question = await interviewer.generate_question(
+                # Shuffled across the session's topics, so a mixed interview
+                # jumps between them instead of working through one at a time.
+                topic=next_topic(session.topics, session.asked_topics),
+                difficulty=session.difficulty,
+                avoid=session.asked_prompts,
+            )
+    except LLMError:
+        # Never asked, so never counted.
+        if viewer is not None:
+            await quota.give_back(viewer, counted_on)
+        raise
     await store.add_question(session.id, question)
 
     # The model is free now and stays free while the question is answered
@@ -177,9 +221,15 @@ async def submit_answer(
     store: SessionStoreDep,
     interviewers: InterviewersDep,
     explainer: ExplainerDep,
+    settings: SettingsDep,
+    viewer: ViewerDep,
 ) -> Grade:
-    session = await _require_session(store, session_id)
+    session = await _require_session(store, session_id, viewer)
     question = _require_question(session, body.question_id)
+    # Where questions are counted, each one buys a single grade: answering the
+    # same question over and over would otherwise be uncounted model calls.
+    if settings.sign_in_required and question.id in session.grades:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This question has already been graded")
     interviewer = _interviewer_for(session.model_provider, interviewers)
 
     async with explainer.foreground():
@@ -199,8 +249,9 @@ async def explain_question(
     store: SessionStoreDep,
     interviewers: InterviewersDep,
     explainer: ExplainerDep,
+    viewer: ViewerDep,
 ) -> Explanation:
-    session = await _require_session(store, session_id)
+    session = await _require_session(store, session_id, viewer)
     question = _require_question(session, question_id)
 
     if question_id not in session.grades:
