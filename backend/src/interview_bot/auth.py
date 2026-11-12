@@ -8,6 +8,7 @@ kept: in a signed, httpOnly cookie the browser cannot read or alter.
 from dataclasses import asdict, dataclass
 from typing import Any, Protocol
 
+import httpx2
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -16,6 +17,9 @@ from starlette.responses import Response
 from interview_bot.config import Settings, SignInProvider
 
 SESSION_USER = "user"
+
+# A provider that cannot be reached is a sign-in that did not finish, not a 500.
+_SIGN_IN_ERRORS = (OAuthError, httpx2.HTTPError)
 
 
 @dataclass(frozen=True)
@@ -58,7 +62,7 @@ class GoogleProvider:
     async def identify(self, request: Request) -> User:
         try:
             token = await self._client.authorize_access_token(request)
-        except OAuthError as exc:
+        except _SIGN_IN_ERRORS as exc:
             raise SignInFailed(str(exc)) from exc
         claims = token.get("userinfo") or {}
         if "sub" not in claims:
@@ -92,7 +96,7 @@ class GitHubProvider:
             token = await self._client.authorize_access_token(request)
             profile = (await self._client.get("user", token=token)).json()
             emails = (await self._client.get("user/emails", token=token)).json()
-        except OAuthError as exc:
+        except _SIGN_IN_ERRORS as exc:
             raise SignInFailed(str(exc)) from exc
         if "id" not in profile:
             raise SignInFailed("GitHub sent no account id")

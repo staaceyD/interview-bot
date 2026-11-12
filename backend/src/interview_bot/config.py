@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     github_client_id: str | None = None
     github_client_secret: SecretStr | None = None
 
-
+    sign_in_required: bool = False
     daily_question_limit: int = 5
     daily_question_limit_total: int = 20
     unlimited_emails: list[str] = []
@@ -71,14 +71,14 @@ class Settings(BaseSettings):
     def _production(self) -> "Settings":
         if self.environment == "production":
             self.default_model_provider = "anthropic"
-            if self.session_secret is None:
-                raise ValueError("INTERVIEW_BOT_SESSION_SECRET is required in production")
+            # Forced rather than defaulted: a public deployment that forgot the
+            # flag would spend the owner's key on anyone.
+            self.sign_in_required = True
+        if self.sign_in_required and self.session_secret is None:
+            # A made-up secret would sign everyone out on every restart, and a
+            # fixed default would let anyone forge a session.
+            raise ValueError("INTERVIEW_BOT_SESSION_SECRET is required when sign-in is")
         return self
-
-    @property
-    def sign_in_required(self) -> bool:
-        """Whether an interview needs a signed-in visitor, and is counted against them."""
-        return self.environment == "production"
 
     @property
     def sign_in_providers(self) -> list[SignInProvider]:
