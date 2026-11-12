@@ -29,16 +29,16 @@ const sessionState: SessionState = {
   current_explanation: null,
 };
 
-const signedOut: Account = {
-  sign_in_required: true,
-  providers: ["google", "github"],
+const signInNotRequired: Account = {
+  sign_in_required: false,
+  providers: [],
   user: null,
   questions_left: null,
 };
 
 function fakeApi(overrides: Partial<Api> = {}): Api {
   return {
-    account: vi.fn().mockResolvedValue(signedOut),
+    account: vi.fn().mockResolvedValue(signInNotRequired),
     signOut: vi.fn().mockResolvedValue(undefined),
     resumeSession: vi.fn().mockResolvedValue(sessionState),
     startSession: vi.fn().mockResolvedValue(session),

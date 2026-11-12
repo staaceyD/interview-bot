@@ -52,16 +52,16 @@ const sessionState: SessionState = {
   current_explanation: null,
 };
 
-const signedOut: Account = {
-  sign_in_required: true,
-  providers: ["google", "github"],
+const signInNotRequired: Account = {
+  sign_in_required: false,
+  providers: [],
   user: null,
   questions_left: null,
 };
 
 function fakeApi(overrides: Partial<Api> = {}): Api {
   return {
-    account: vi.fn().mockResolvedValue(signedOut),
+    account: vi.fn().mockResolvedValue(signInNotRequired),
     signOut: vi.fn().mockResolvedValue(undefined),
     resumeSession: vi.fn().mockResolvedValue(sessionState),
     startSession: vi.fn().mockResolvedValue(session),
@@ -673,27 +673,53 @@ describe("the model picker", () => {
 });
 
 describe("the hosted build", () => {
+  beforeEach(() => vi.stubEnv("VITE_APP_ENV", "production"));
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("offers no model to switch to", async () => {
+    render(<App api={fakeApi()} />);
+
+    await screen.findByRole("button", { name: /start interview/i });
+    expect(screen.queryByLabelText(/^model$/i)).not.toBeInTheDocument();
+  });
+
+  it("starts the interview on Claude", async () => {
+    const api = fakeApi();
+    const user = userEvent.setup();
+    render(<App api={api} />);
+
+    await user.click(screen.getByRole("button", { name: /start interview/i }));
+    await screen.findByText(question.prompt);
+
+    expect(api.startSession).toHaveBeenCalledWith(["python"], "mid", "anthropic");
+  });
+});
+
+describe("sign-in", () => {
+  const signedOut: Account = {
+    sign_in_required: true,
+    providers: ["google", "github"],
+    user: null,
+    questions_left: null,
+  };
   const signedIn = (questionsLeft: number | null = 20): Account => ({
     ...signedOut,
     user: { name: "Ada", email: "ada@example.com" },
     questions_left: questionsLeft,
   });
 
-  beforeEach(() => vi.stubEnv("VITE_APP_ENV", "production"));
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    window.history.replaceState(null, "", "/");
-  });
+  afterEach(() => window.history.replaceState(null, "", "/"));
 
-  it("offers no model to switch to", async () => {
+  it("is not asked for when the backend does not require it", async () => {
     render(<App api={fakeApi()} />);
 
-    await screen.findByText(/sign in to start/i);
-    expect(screen.queryByLabelText(/^model$/i)).not.toBeInTheDocument();
+    await screen.findByRole("button", { name: /start interview/i });
+    expect(screen.queryByRole("link", { name: /sign in with/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start interview/i })).toBeEnabled();
   });
 
-  it("shows the topics to a visitor who is signed out, but will not start", async () => {
-    render(<App api={fakeApi()} />);
+  it("is asked for whenever the backend requires it, whatever the build", async () => {
+    render(<App api={fakeApi({ account: vi.fn().mockResolvedValue(signedOut) })} />);
 
     expect(await screen.findByRole("link", { name: /sign in with google/i })).toHaveAttribute(
       "href",
@@ -705,24 +731,20 @@ describe("the hosted build", () => {
     expect(screen.getByText(/sign in above to start/i)).toBeInTheDocument();
   });
 
-  it("starts the interview on Claude once signed in", async () => {
+  it("lets a signed-in visitor start", async () => {
     const api = fakeApi({ account: vi.fn().mockResolvedValue(signedIn()) });
     const user = userEvent.setup();
     render(<App api={api} />);
 
     await screen.findByText(/signed in as/i);
     await user.click(screen.getByRole("button", { name: /start interview/i }));
-    await screen.findByText(question.prompt);
 
-    expect(api.startSession).toHaveBeenCalledWith(["python"], "mid", "anthropic");
+    expect(await screen.findByText(question.prompt)).toBeInTheDocument();
   });
 
   it("shows the questions left, as the backend counts them", async () => {
     const api = fakeApi({
-      account: vi
-        .fn()
-        .mockResolvedValueOnce(signedIn(20))
-        .mockResolvedValue(signedIn(19)),
+      account: vi.fn().mockResolvedValueOnce(signedIn(20)).mockResolvedValue(signedIn(19)),
     });
     const user = userEvent.setup();
     render(<App api={api} />);
@@ -731,6 +753,23 @@ describe("the hosted build", () => {
     await user.click(screen.getByRole("button", { name: /start interview/i }));
 
     expect(await screen.findByText(/19 questions left today/i)).toBeInTheDocument();
+  });
+
+  it("keeps a question that loaded when the count cannot be refreshed", async () => {
+    const api = fakeApi({
+      account: vi
+        .fn()
+        .mockResolvedValueOnce(signedIn(20))
+        .mockRejectedValue(new ApiError("Cannot reach the server.")),
+    });
+    const user = userEvent.setup();
+    render(<App api={api} />);
+    await screen.findByText(/signed in as/i);
+
+    await user.click(screen.getByRole("button", { name: /start interview/i }));
+
+    expect(await screen.findByText(question.prompt)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("will not start once the day's questions are used", async () => {
@@ -756,7 +795,7 @@ describe("the hosted build", () => {
         .fn()
         .mockResolvedValueOnce(question)
         .mockRejectedValue(
-          new ApiError("You have used all 20 of today's questions. They reset at midnight UTC.", 429),
+          new ApiError("You have used all 5 of today's questions. They reset at midnight UTC.", 429),
         ),
     });
     const user = userEvent.setup();
@@ -767,7 +806,31 @@ describe("the hosted build", () => {
 
     await user.click(screen.getByRole("button", { name: /skip/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/used all 20/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/used all 5/i);
+  });
+
+  it("offers sign-in again when the sign-in runs out mid-interview", async () => {
+    const api = fakeApi({
+      account: vi
+        .fn()
+        .mockResolvedValueOnce(signedIn())
+        .mockResolvedValueOnce(signedIn())
+        .mockResolvedValue(signedOut),
+      nextQuestion: vi
+        .fn()
+        .mockResolvedValueOnce(question)
+        .mockRejectedValue(new ApiError("Sign in to start an interview", 401)),
+    });
+    const user = userEvent.setup();
+    render(<App api={api} />);
+    await screen.findByText(/signed in as/i);
+    await user.click(screen.getByRole("button", { name: /start interview/i }));
+    await screen.findByText(question.prompt);
+
+    await user.click(screen.getByRole("button", { name: /skip/i }));
+
+    expect(await screen.findByRole("link", { name: /sign in with github/i })).toBeInTheDocument();
+    expect(screen.queryByText(/signed in as/i)).not.toBeInTheDocument();
   });
 
   it("signs out, and goes back to the sign-in buttons", async () => {
@@ -786,7 +849,7 @@ describe("the hosted build", () => {
 
   it("says so when signing in did not finish", async () => {
     window.history.replaceState(null, "", "/?sign_in=failed");
-    render(<App api={fakeApi()} />);
+    render(<App api={fakeApi({ account: vi.fn().mockResolvedValue(signedOut) })} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/signing in did not finish/i);
     expect(window.location.search).toBe("");
@@ -795,6 +858,7 @@ describe("the hosted build", () => {
   it("forgets an interview it is not signed in to resume", async () => {
     localStorage.setItem(STORAGE_KEY, "s1");
     const api = fakeApi({
+      account: vi.fn().mockResolvedValue(signedOut),
       resumeSession: vi.fn().mockRejectedValue(new ApiError("Sign in to start an interview", 401)),
     });
     render(<App api={api} />);

@@ -3,16 +3,12 @@ import { SIGN_IN_PROVIDERS } from "../api/types";
 import type { Account } from "../api/types";
 
 type Props = {
-  account: Account | null;
+  account: Account;
   disabled: boolean;
   onSignOut: () => void;
 };
 
 export function AccountPanel({ account, disabled, onSignOut }: Props) {
-  if (account === null) {
-    return <p className="hint account">Checking whether you are signed in…</p>;
-  }
-
   if (account.user === null) {
     return (
       <section className="card account">

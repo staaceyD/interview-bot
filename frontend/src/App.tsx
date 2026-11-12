@@ -30,8 +30,6 @@ export function App({ api = defaultApi }: { api?: Api }) {
   const [modelProvider, setModelProvider] = useState<string>(() =>
     isHosted() ? "anthropic" : "ollama",
   );
-  // Hosted, an interview needs a signed-in visitor with questions left. Null
-  // until the backend has said who, if anyone, is signed in.
   const [account, setAccount] = useState<Account | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
@@ -51,8 +49,6 @@ export function App({ api = defaultApi }: { api?: Api }) {
   const resumed = useRef(false);
 
   useEffect(() => {
-    if (!isHosted()) return;
-    // Where a provider sends the visitor back to when sign-in did not finish.
     const params = new URLSearchParams(window.location.search);
     if (params.get("sign_in") === "failed") {
       setError("Signing in did not finish. Try again.");
@@ -63,9 +59,12 @@ export function App({ api = defaultApi }: { api?: Api }) {
     );
   }, [api]);
 
-  // After each question, so the count on screen is the backend's own.
-  const refreshAccount = async () => {
-    if (isHosted()) setAccount(await api.account());
+  const signInRequired = account?.sign_in_required === true;
+
+  // Best effort: the question count is a hint, and failing to refresh it must
+  // not turn a question that loaded into an error.
+  const refreshAccount = () => {
+    if (signInRequired) api.account().then(setAccount, () => {});
   };
 
   useEffect(() => {
@@ -117,6 +116,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
       await action();
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Something went wrong.");
+      if (caught instanceof ApiError && caught.status === 401) refreshAccount();
     } finally {
       setBusy(false);
     }
@@ -133,7 +133,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
       setQuestion(first);
       setGrade(null);
       setExplanation(null);
-      await refreshAccount();
+      refreshAccount();
     });
 
   const next = () =>
@@ -143,7 +143,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
       setQuestion(following);
       setGrade(null);
       setExplanation(null);
-      await refreshAccount();
+      refreshAccount();
     });
 
   const answer = (text: string) =>
@@ -193,8 +193,7 @@ export function App({ api = defaultApi }: { api?: Api }) {
       setAccount(await api.account());
     });
 
-  // Why an interview cannot start yet, where it cannot.
-  const blocked = !isHosted()
+  const blocked = !signInRequired
     ? undefined
     : account?.user == null
       ? "Sign in above to start."
@@ -246,9 +245,10 @@ export function App({ api = defaultApi }: { api?: Api }) {
         </div>
       ) : (
         <div role="tabpanel" id="panel-interview" aria-labelledby="tab-interview">
-          {isHosted() ? (
+          {signInRequired && account && (
             <AccountPanel account={account} disabled={busy} onSignOut={signOut} />
-          ) : (
+          )}
+          {!isHosted() && (
             <ModelPicker modelProvider={modelProvider} disabled={busy} onChange={chooseModel} />
           )}
 

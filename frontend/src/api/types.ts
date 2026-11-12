@@ -66,7 +66,8 @@ export type Account = {
   sign_in_required: boolean;
   providers: SignInProvider[];
   user: { name: string; email: string | null } | null;
-  // Null when the visitor is not counted: signed out, or unlimited.
+  // Null when the visitor is not counted: signed out, unlimited, or sign-in
+  // is not required.
   questions_left: number | null;
 };
 
