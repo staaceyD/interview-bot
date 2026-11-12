@@ -1,55 +1,23 @@
 """The contract every SessionStore must satisfy, run against each implementation."""
 
 import asyncio
-import os
 from collections.abc import AsyncIterator
 from datetime import date
 
-import psycopg
 import pytest
 
 from interview_bot.domain import Difficulty, Explanation, Grade, Question, Topic
-from interview_bot.store import (
-    InMemorySessionStore,
-    PostgresSessionStore,
-    SessionStore,
-    SQLiteSessionStore,
-)
-
-# Postgres runs only where there is one to run against, as in CI. Every table is
-# dropped first, so each test starts on an empty database.
-TEST_DATABASE_URL = os.environ.get("INTERVIEW_BOT_TEST_DATABASE_URL")
+from interview_bot.store import InMemorySessionStore, PostgresSessionStore, SessionStore
+from postgres_db import empty_database, needs_postgres
 
 
-async def _empty_postgres(url: str) -> None:
-    async with await psycopg.AsyncConnection.connect(url, autocommit=True) as conn:
-        await conn.execute(
-            "DROP TABLE IF EXISTS usage, explanations, grades, questions, sessions CASCADE"
-        )
-
-
-@pytest.fixture(
-    params=[
-        "memory",
-        "sqlite",
-        pytest.param(
-            "postgres",
-            marks=pytest.mark.skipif(
-                TEST_DATABASE_URL is None, reason="INTERVIEW_BOT_TEST_DATABASE_URL is not set"
-            ),
-        ),
-    ]
-)
-async def store(request: pytest.FixtureRequest, tmp_path) -> AsyncIterator[SessionStore]:
-    built: SessionStore
-    if request.param == "memory":
-        built = InMemorySessionStore()
-    elif request.param == "sqlite":
-        built = SQLiteSessionStore(tmp_path / "interview_bot.db")
-    else:
-        assert TEST_DATABASE_URL is not None
-        await _empty_postgres(TEST_DATABASE_URL)
-        built = PostgresSessionStore(TEST_DATABASE_URL)
+@pytest.fixture(params=["memory", pytest.param("postgres", marks=needs_postgres)])
+async def store(request: pytest.FixtureRequest) -> AsyncIterator[SessionStore]:
+    built: SessionStore = (
+        InMemorySessionStore()
+        if request.param == "memory"
+        else PostgresSessionStore(await empty_database())
+    )
     await built.initialize()
     yield built
     await built.aclose()
