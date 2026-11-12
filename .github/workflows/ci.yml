@@ -4,12 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Run again by the deploy, so nothing reaches production untested.
   workflow_call:
 
 concurrency:
-  # Keyed on the workflow too: when the deploy calls this, github.workflow is
-  # "Deploy", so it never cancels (or waits on) a CI run of the same commit.
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -68,7 +65,6 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # npm 10 crashes resolving this dependency tree (arborist "edgesOut" bug).
       - run: npm install -g npm@12
 
       - run: npm ci
@@ -85,8 +81,6 @@ jobs:
       - name: Build
         run: npm run build
 
-  # The image the deploy runs, built so a broken Dockerfile fails here rather
-  # than on Render.
   docker:
     runs-on: ubuntu-latest
     steps:
