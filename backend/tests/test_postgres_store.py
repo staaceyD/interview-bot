@@ -108,3 +108,30 @@ def test_factory_rejects_an_unknown_backend() -> None:
 
     with pytest.raises(ValueError, match="sqlite"):
         build_session_store(settings)
+
+
+SECRET_URL = "postgresql://owner:s3cret-password@db.example.com/app?sslmode=require"
+
+
+@pytest.mark.parametrize("pasted", [f'"{SECRET_URL}"', f"'{SECRET_URL}'", f"  {SECRET_URL}\n"])
+def test_a_connection_string_pasted_with_quotes_still_works(pasted: str) -> None:
+    settings = Settings(_env_file=None, database_url=pasted, database_url_unpooled=pasted)
+
+    assert settings.database_url is not None
+    assert settings.database_url_unpooled is not None
+    assert settings.database_url.get_secret_value() == SECRET_URL
+    assert settings.database_url_unpooled.get_secret_value() == SECRET_URL
+
+
+async def test_a_broken_connection_string_is_reported_without_its_password() -> None:
+    # What Render got: the URL in quotes reaches psycopg as key=value settings.
+    store = PostgresSessionStore(f'"{SECRET_URL}"')
+
+    with pytest.raises(Exception) as raised:
+        await store.initialize()
+
+    reported = "".join(
+        str(error) for error in (raised.value, raised.value.__cause__, raised.value.__context__)
+    )
+    assert "DATABASE_URL" in str(raised.value)
+    assert "s3cret-password" not in reported

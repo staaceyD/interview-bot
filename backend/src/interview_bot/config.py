@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, get_args
 
-from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ModelProvider = Literal["ollama", "anthropic", "echo"]
@@ -62,6 +62,17 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173"]
     static_dir: Path | None = None
+
+    @field_validator("database_url", "database_url_unpooled")
+    @classmethod
+    def _unquoted(cls, value: SecretStr | None) -> SecretStr | None:
+        # Copied out of a .env file, a connection string keeps its quotes.
+        if value is None:
+            return None
+        text = value.get_secret_value().strip()
+        if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+            text = text[1:-1]
+        return SecretStr(text)
 
     @model_validator(mode="after")
     def _production(self) -> "Settings":
