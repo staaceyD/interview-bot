@@ -8,7 +8,6 @@ from psycopg_pool import AsyncConnectionPool
 from interview_bot.domain import Difficulty, Explanation, Grade, Question, Topic
 from interview_bot.store.base import DEFAULT_MODEL_PROVIDER, Session, new_session_id
 
-# The same shape as the SQLite schema, so the two stores read alike.
 SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS sessions (
     id             TEXT PRIMARY KEY,

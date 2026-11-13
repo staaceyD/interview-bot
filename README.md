@@ -38,10 +38,20 @@ their own tab.
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [Docker](https://docs.docker.com/get-docker/), for the local Postgres database
 - [Ollama](https://ollama.com/download), unless you run against a hosted model
 - Node 20 or newer, with npm 11 or newer
 
 ## Setup
+
+Start the database:
+
+```sh
+docker compose up -d db
+```
+
+It runs Postgres on `localhost:5432`, which is where the backend looks by
+default. To use another database, set `DATABASE_URL`.
 
 Install the backend dependencies:
 
@@ -64,8 +74,9 @@ ollama serve
 ollama pull qwen3:4b-instruct
 ```
 
-Or skip Ollama and use a hosted model instead — see [Running against a hosted
-model](#running-against-a-hosted-model).
+Or skip Ollama and use Claude instead: set `ANTHROPIC_API_KEY` in the backend's
+environment and pick **Claude** in the app. It is quicker, and costs about a
+cent a question.
 
 ## Run
 
@@ -89,14 +100,12 @@ Open http://localhost:5173 and tick the topics you want. The API is on
 http://localhost:8000, with interactive docs on http://localhost:8000/docs.
 
 Ticking more than one topic makes it a mixed interview: each question comes
-from one of them, shuffled, and the tag above the question says which — see
-[Mixed topics](#mixed-topics).
+from one of them, shuffled, and the tag above the question says which.
 
 A **Model** dropdown above the topics sits over the whole interview. It starts
 on **Ollama (free)**, the model on your own machine, and switching it to
 **Claude** moves the interview onto the hosted model from the next question
-onwards — see [Running against a hosted model](#running-against-a-hosted-model)
-for what that needs and what it costs.
+onwards. Claude needs `ANTHROPIC_API_KEY` set for the backend.
 
 **Skip**, under the answer box, passes on a question you already know without
 answering it. Nothing is graded, and the question does not come round again —
@@ -113,7 +122,7 @@ question and typing, so by the time you click there is usually nothing left to
 wait for.
 
 **Note to self** opens a box to jot down a topic you want to learn properly
-later, and the notes pile up under the **Notes** tab — see [Notes](#notes).
+later, and the notes pile up under the **Notes** tab.
 
 Refreshing the page picks the interview back up where you left it. Use
 **Start over** to drop it and choose different topics.
@@ -140,7 +149,13 @@ uv run ruff format .
 ```
 
 The Postgres store's tests run only when `INTERVIEW_BOT_TEST_DATABASE_URL`
-points at a database they may wipe; CI starts one for them.
+points at a database they may wipe; CI starts one for them. Locally, give them
+their own database next to the app's:
+
+```sh
+docker compose exec db createdb -U postgres interview_bot_test
+INTERVIEW_BOT_TEST_DATABASE_URL=postgresql://postgres@localhost:5432/interview_bot_test uv run pytest
+```
 
 Frontend:
 

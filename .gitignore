@@ -217,11 +217,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local interview history
-*.db
-*.db-wal
-*.db-shm
-
 # Connection strings written by `neon deploy`
 .env.local
 .env.*.local

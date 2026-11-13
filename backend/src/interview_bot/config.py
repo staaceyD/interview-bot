@@ -6,18 +6,18 @@ from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ModelProvider = Literal["ollama", "anthropic", "echo"]
-StoreBackend = Literal["sqlite", "memory", "postgres"]
+StoreBackend = Literal["postgres", "memory"]
 SignInProvider = Literal["google", "github"]
 Environment = Literal["development", "production"]
 
-# Where `neon deploy` writes the Neon branch's variables: the repository root.
-NEON_ENV_FILE = Path(__file__).resolve().parents[3] / ".env.local"
+# The database `docker compose up -d db` starts: local only, so no password.
+LOCAL_DATABASE_URL = "postgresql://postgres@localhost:5432/interview_bot"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="INTERVIEW_BOT_",
-        env_file=(NEON_ENV_FILE, ".env.local", ".env"),
+        env_file=".env",
         extra="ignore",
         populate_by_name=True,
     )
@@ -35,12 +35,8 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-haiku-4-5"
     anthropic_max_tokens: int = 4096
 
-    store_backend: StoreBackend = "sqlite"
-    sqlite_path: Path = Path("interview_bot.db")
-    # Neon's own names, as `neon deploy` writes them, so nothing has to be
-    # renamed by hand. Only read with the postgres backend, so a local run stays
-    # on SQLite even with Neon's file in place.
-    # Pooled, through Neon's PgBouncer: every query the app makes.
+    store_backend: StoreBackend = "postgres"
+    # Neon's names for its pooled and direct connection strings.
     database_url: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices("INTERVIEW_BOT_DATABASE_URL", "DATABASE_URL"),
@@ -69,6 +65,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _production(self) -> "Settings":
+        if self.database_url is None and self.environment == "development":
+            # Never in production, where a missing URL must fail rather than
+            # quietly look for a database on localhost.
+            self.database_url = SecretStr(LOCAL_DATABASE_URL)
         if self.environment == "production":
             self.default_model_provider = "anthropic"
             # Forced rather than defaulted: a public deployment that forgot the
