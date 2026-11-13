@@ -162,7 +162,8 @@ one URL and nothing to configure for CORS. Interviews are kept in a free
 survive a restart.
 
 It runs with `INTERVIEW_BOT_ENVIRONMENT=production`, which changes three things.
-Running locally, none of them apply.
+Running locally, none of them apply, though sign-in and the limits can be turned
+on with `INTERVIEW_BOT_SIGN_IN_REQUIRED=true`.
 
 - **Claude only.** There is no Ollama next to the server, so the **Model**
   dropdown is gone.
@@ -173,8 +174,8 @@ Running locally, none of them apply.
   in a signed, `httpOnly`, `Secure`, `SameSite=Lax` cookie. An interview belongs
   to whoever started it, and to anyone else it does not exist.
 - **Daily limits**, so a public URL cannot run up the bill:
-  - 20 questions a day per account (`INTERVIEW_BOT_DAILY_QUESTION_LIMIT`).
-  - 200 a day for everyone together (`INTERVIEW_BOT_DAILY_QUESTION_LIMIT_TOTAL`),
+  - 5 questions a day per account (`INTERVIEW_BOT_DAILY_QUESTION_LIMIT`).
+  - 20 a day for everyone together (`INTERVIEW_BOT_DAILY_QUESTION_LIMIT_TOTAL`),
     however many accounts are made.
   - The emails in `INTERVIEW_BOT_UNLIMITED_EMAILS` are never counted. Only an
     address the provider has verified counts.

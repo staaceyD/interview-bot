@@ -14,6 +14,7 @@ RUN npm run build
 
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /usr/local/bin/uv
+RUN useradd --system --uid 10001 --no-create-home app
 WORKDIR /app/backend
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 # Dependencies first, so a code change does not reinstall them.
@@ -26,6 +27,7 @@ COPY --from=frontend /app/frontend/dist /app/frontend/dist
 ENV PATH="/app/backend/.venv/bin:$PATH" \
     INTERVIEW_BOT_ENVIRONMENT=production \
     INTERVIEW_BOT_STATIC_DIR=/app/frontend/dist
+USER app
 # The host says which port to listen on. Its proxy ends TLS, so the forwarded
 # headers are trusted: the sign-in callback URL has to come out as https.
 CMD ["sh", "-c", "uvicorn interview_bot.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

@@ -22,7 +22,7 @@ jobs:
           DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           if [ -z "$DEPLOY_HOOK" ]; then
-            echo "::error::Set the RENDER_DEPLOY_HOOK_URL secret first (see README, Deploy)."
+            echo "::error::Set the RENDER_DEPLOY_HOOK_URL repository secret first."
             exit 1
           fi
           curl --fail --silent --show-error -X POST "$DEPLOY_HOOK"
