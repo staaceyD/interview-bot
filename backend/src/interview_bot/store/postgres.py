@@ -2,6 +2,7 @@ import json
 from datetime import date
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import TupleRow
 from psycopg_pool import AsyncConnectionPool
 
@@ -69,6 +70,7 @@ class PostgresSessionStore:
         On Neon the first is the pooled string and the second the direct one:
         the pooler runs in transaction mode, which is for queries, not DDL.
         """
+        self._conninfo = conninfo
         self._schema_conninfo = schema_conninfo or conninfo
         # Opened in initialize(), inside the running event loop.
         self._pool = AsyncConnectionPool(
@@ -83,6 +85,14 @@ class PostgresSessionStore:
         )
 
     async def initialize(self) -> None:
+        # Checked before the pool sees them: psycopg quotes a string it cannot
+        # parse in its error, password and all, and the pool logs those errors.
+        for setting, conninfo in (
+            ("DATABASE_URL", self._conninfo),
+            ("DATABASE_URL_UNPOOLED", self._schema_conninfo),
+        ):
+            if not _parses(conninfo):
+                raise ValueError(f"{setting} is not a valid Postgres connection string")
         async with await psycopg.AsyncConnection.connect(
             self._schema_conninfo, autocommit=True
         ) as conn:
@@ -244,6 +254,16 @@ class PostgresSessionStore:
 
     async def aclose(self) -> None:
         await self._pool.close()
+
+
+def _parses(conninfo: str) -> bool:
+    # Answered outside the except block, so the error raised for a bad string
+    # carries no trace of psycopg's, which quotes it.
+    try:
+        conninfo_to_dict(conninfo)
+    except psycopg.ProgrammingError:
+        return False
+    return True
 
 
 def _to_question(row: TupleRow) -> Question:
