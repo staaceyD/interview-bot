@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
 import type { Api } from "../api/client";
-import type { Grade, Question, Session, SessionState } from "../api/types";
+import type { Account, Grade, Question, Session, SessionState } from "../api/types";
 
 const session: Session = {
   session_id: "s1",
@@ -29,8 +29,17 @@ const sessionState: SessionState = {
   current_explanation: null,
 };
 
+const signInNotRequired: Account = {
+  sign_in_required: false,
+  providers: [],
+  user: null,
+  questions_left: null,
+};
+
 function fakeApi(overrides: Partial<Api> = {}): Api {
   return {
+    account: vi.fn().mockResolvedValue(signInNotRequired),
+    signOut: vi.fn().mockResolvedValue(undefined),
     resumeSession: vi.fn().mockResolvedValue(sessionState),
     startSession: vi.fn().mockResolvedValue(session),
     switchModel: vi.fn().mockResolvedValue(session),

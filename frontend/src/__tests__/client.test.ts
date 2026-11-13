@@ -157,3 +157,23 @@ describe("error handling", () => {
     );
   });
 });
+
+describe("account", () => {
+  it("reads who is signed in", async () => {
+    const fetchSpy = mockFetch({ json: async () => ({ user: null }) });
+
+    await api.account();
+
+    expect(fetchSpy.mock.calls[0][0]).toBe("http://localhost:8000/auth/me");
+  });
+
+  it("signs out with a POST that has nothing to return", async () => {
+    const fetchSpy = mockFetch({ status: 204, json: async () => Promise.reject(new Error()) });
+
+    await expect(api.signOut()).resolves.toBeUndefined();
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe("http://localhost:8000/auth/logout");
+    expect(init.method).toBe("POST");
+  });
+});

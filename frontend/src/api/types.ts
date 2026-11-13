@@ -55,6 +55,22 @@ export type ModelProvider = (typeof MODEL_PROVIDERS)[number]["value"];
 // so there is nothing to pick between. Read when called, so a test can stub it.
 export const isHosted = () => import.meta.env.VITE_APP_ENV === "production";
 
+export const SIGN_IN_PROVIDERS = {
+  google: "Google",
+  github: "GitHub",
+} as const;
+
+export type SignInProvider = keyof typeof SIGN_IN_PROVIDERS;
+
+export type Account = {
+  sign_in_required: boolean;
+  providers: SignInProvider[];
+  user: { name: string; email: string | null } | null;
+  // Null when the visitor is not counted: signed out, unlimited, or sign-in
+  // is not required.
+  questions_left: number | null;
+};
+
 export const DIFFICULTIES = ["junior", "mid", "senior"] as const;
 
 export type Difficulty = (typeof DIFFICULTIES)[number];
