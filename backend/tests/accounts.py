@@ -1,5 +1,6 @@
 """Signed-in visitors for the sign-in, ownership and daily-limit tests."""
 
+import asyncio
 from collections.abc import AsyncIterator
 
 from httpx import ASGITransport, AsyncClient
@@ -58,6 +59,8 @@ class Interviews(EchoClient):
         self.fail = False
 
     async def complete(self, *, system: str, prompt: str, **kwargs: object) -> str:
+        # A real model takes seconds to answer, and other requests run meanwhile.
+        await asyncio.sleep(0.01)
         if self.fail:
             raise LLMError("down")
         if system == GENERATE_SYSTEM:

@@ -226,14 +226,22 @@ async def submit_answer(
 ) -> Grade:
     session = await _require_session(store, session_id, viewer)
     question = _require_question(session, body.question_id)
+    interviewer = _interviewer_for(session.model_provider, interviewers)
     # Where questions are counted, each one buys a single grade: answering the
     # same question over and over would otherwise be uncounted model calls.
-    if settings.sign_in_required and question.id in session.grades:
+    one_grade_only = settings.sign_in_required
+    if one_grade_only and (
+        question.id in session.grades or not await store.claim_grade(question.id)
+    ):
         raise HTTPException(status.HTTP_409_CONFLICT, "This question has already been graded")
-    interviewer = _interviewer_for(session.model_provider, interviewers)
 
-    async with explainer.foreground():
-        grade = await interviewer.grade(question=question, answer=body.answer)
+    try:
+        async with explainer.foreground():
+            grade = await interviewer.grade(question=question, answer=body.answer)
+    except LLMError:
+        if one_grade_only:
+            await store.release_grade(question.id)
+        raise
     await store.record_grade(session.id, question.id, grade)
 
     # Picked up again in case answering interrupted it, or the API restarted

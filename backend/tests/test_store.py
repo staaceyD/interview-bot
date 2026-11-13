@@ -259,3 +259,22 @@ async def test_concurrent_takes_never_pass_the_limit(store: SessionStore) -> Non
 
     assert taken.count(True) == 3
     assert await store.questions_taken(user_id="u", day=TODAY) == 3
+
+
+async def test_a_question_has_one_grade_claim(store: SessionStore) -> None:
+    session = await store.create(topics=[Topic.PYTHON], difficulty=Difficulty.MID)
+    await store.add_question(session.id, a_question("q"))
+
+    claims = await asyncio.gather(*(store.claim_grade("q") for _ in range(10)))
+
+    assert claims.count(True) == 1
+
+
+async def test_a_released_grade_claim_can_be_claimed_again(store: SessionStore) -> None:
+    session = await store.create(topics=[Topic.PYTHON], difficulty=Difficulty.MID)
+    await store.add_question(session.id, a_question("q"))
+    await store.claim_grade("q")
+
+    await store.release_grade("q")
+
+    assert await store.claim_grade("q")

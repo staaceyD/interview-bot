@@ -17,6 +17,7 @@ async def empty_database() -> str:
     assert TEST_DATABASE_URL is not None
     async with await psycopg.AsyncConnection.connect(TEST_DATABASE_URL, autocommit=True) as conn:
         await conn.execute(
-            "DROP TABLE IF EXISTS usage, explanations, grades, questions, sessions CASCADE"
+            "DROP TABLE IF EXISTS usage, grade_claims, explanations, grades, questions, sessions"
+            " CASCADE"
         )
     return TEST_DATABASE_URL

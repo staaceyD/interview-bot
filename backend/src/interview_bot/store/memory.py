@@ -10,6 +10,7 @@ class InMemorySessionStore:
     def __init__(self) -> None:
         self._sessions: dict[str, Session] = {}
         self._usage: dict[tuple[str, date], int] = {}
+        self._grade_claims: set[str] = set()
 
     async def initialize(self) -> None:
         return None
@@ -48,6 +49,15 @@ class InMemorySessionStore:
         self, session_id: str, question_id: str, explanation: Explanation
     ) -> None:
         self._sessions[session_id].explanations[question_id] = explanation
+
+    async def claim_grade(self, question_id: str) -> bool:
+        if question_id in self._grade_claims:
+            return False
+        self._grade_claims.add(question_id)
+        return True
+
+    async def release_grade(self, question_id: str) -> None:
+        self._grade_claims.discard(question_id)
 
     async def take_question(self, *, user_id: str, day: date, limit: int) -> bool:
         # Nothing awaits between the check and the count, so it is atomic.

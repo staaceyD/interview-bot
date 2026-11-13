@@ -110,6 +110,22 @@ async def test_a_question_is_graded_once(visitor: AsyncClient, model: Interviews
     assert model.graded == 1
 
 
+async def test_answers_sent_at_once_are_graded_once(
+    visitor: AsyncClient, model: Interviews
+) -> None:
+    await sign_in(visitor)
+    session_id = await start(visitor)
+    question_id = (await visitor.post(f"/sessions/{session_id}/questions")).json()["question_id"]
+    body = {"question_id": question_id, "answer": "A mutex."}
+
+    responses = await asyncio.gather(
+        *(visitor.post(f"/sessions/{session_id}/answers", json=body) for _ in range(5))
+    )
+
+    assert sorted(r.status_code for r in responses) == [200, 409, 409, 409, 409]
+    assert model.graded == 1
+
+
 async def test_the_owner_is_never_counted(visitor: AsyncClient) -> None:
     await sign_in(visitor, "owner", email=OWNER_EMAIL)
     session_id = await start(visitor)
@@ -125,3 +141,19 @@ async def test_the_owner_needs_a_verified_email(visitor: AsyncClient) -> None:
     await sign_in(visitor, "owner")
 
     assert (await visitor.get("/auth/me")).json()["questions_left"] == 3
+
+
+async def test_a_grade_the_model_failed_to_write_can_be_tried_again(
+    visitor: AsyncClient, model: Interviews
+) -> None:
+    await sign_in(visitor)
+    session_id = await start(visitor)
+    question_id = (await visitor.post(f"/sessions/{session_id}/questions")).json()["question_id"]
+    body = {"question_id": question_id, "answer": "A mutex."}
+
+    model.fail = True
+    failed = await visitor.post(f"/sessions/{session_id}/answers", json=body)
+    model.fail = False
+    retried = await visitor.post(f"/sessions/{session_id}/answers", json=body)
+
+    assert [failed.status_code, retried.status_code] == [502, 200]
