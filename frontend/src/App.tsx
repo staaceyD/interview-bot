@@ -318,6 +318,11 @@ export function App({ api = defaultApi }: { api?: Api }) {
           onClose={() => setNoting(false)}
         />
       )}
+
+      <footer className="legal">
+        <a href="/privacy.html">Privacy policy</a>
+        <a href="/terms.html">Terms of service</a>
+      </footer>
     </main>
   );
 }
