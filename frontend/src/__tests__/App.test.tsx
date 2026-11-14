@@ -868,3 +868,19 @@ describe("sign-in", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+describe("the footer", () => {
+  it("links to the privacy policy and the terms of service", async () => {
+    render(<App api={fakeApi()} />);
+
+    await screen.findByRole("button", { name: /start interview/i });
+    expect(screen.getByRole("link", { name: /privacy policy/i })).toHaveAttribute(
+      "href",
+      "/privacy.html",
+    );
+    expect(screen.getByRole("link", { name: /terms of service/i })).toHaveAttribute(
+      "href",
+      "/terms.html",
+    );
+  });
+});

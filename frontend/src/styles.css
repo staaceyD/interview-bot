@@ -148,6 +148,17 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
+footer.legal {
+  display: flex;
+  gap: 1rem;
+  margin-top: 3rem;
+  font-size: 0.85rem;
+}
+
+footer.legal a {
+  color: var(--muted);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
