@@ -1,21 +1,13 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Privacy policy · Interview Bot</title>
-    <link rel="stylesheet" href="/legal.css" />
-  </head>
-  <body>
-    <main>
-      <p><a href="/">← Interview Bot</a></p>
-      <h1>Privacy policy</h1>
-      <p class="updated">Last updated 14 November 2026</p>
+import { CONTACT_EMAIL } from "./contact";
+import { LegalPage } from "./LegalPage";
 
+export function PrivacyPolicy() {
+  return (
+    <LegalPage title="Privacy policy" updated="15 November 2026">
       <p>
-        Interview Bot is a free practice tool for software engineering interview questions,
-        run by Anastasiia Derevianko as a personal project. This page says what it keeps about
-        you, why, and who else sees it.
+        Interview Bot is a free practice tool for software engineering interview questions, run
+        by Anastasiia Derevianko as a personal project. This page says what it keeps about you,
+        why, and who else sees it.
       </p>
 
       <h2>What is kept, and where</h2>
@@ -59,7 +51,9 @@
           <strong>Render</strong>, which hosts the app and keeps standard server logs, such as IP
           addresses and request times.
         </li>
-        <li><strong>Neon</strong>, which hosts the database.</li>
+        <li>
+          <strong>Neon</strong>, which hosts the database.
+        </li>
       </ul>
       <p>
         Nothing is sold, used for advertising, or shared with anyone else. The app has no
@@ -75,9 +69,8 @@
       <h2>Your choices</h2>
       <p>
         You can sign out at any time, which removes the cookie. To have your interviews and
-        daily counts deleted, email
-        <a href="mailto:aderevianko@proton.me">aderevianko@proton.me</a> from the address you
-        signed in with, and they will be deleted.
+        daily counts deleted, email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> from
+        the address you signed in with, and they will be deleted.
       </p>
 
       <h2>Changes</h2>
@@ -85,6 +78,6 @@
         If this policy changes, the date at the top will change with it. The current version is
         always on this page.
       </p>
-    </main>
-  </body>
-</html>
+    </LegalPage>
+  );
+}

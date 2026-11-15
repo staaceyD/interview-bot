@@ -1,21 +1,12 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Terms of service · Interview Bot</title>
-    <link rel="stylesheet" href="/legal.css" />
-  </head>
-  <body>
-    <main>
-      <p><a href="/">← Interview Bot</a></p>
-      <h1>Terms of service</h1>
-      <p class="updated">Last updated 14 November 2026</p>
+import { CONTACT_EMAIL } from "./contact";
+import { LegalPage } from "./LegalPage";
 
+export function TermsOfService() {
+  return (
+    <LegalPage title="Terms of service" updated="15 November 2026">
       <p>
-        Interview Bot is a free practice tool for software engineering interview questions,
-        run by Anastasiia Derevianko as a personal project. By using it you agree to these
-        terms.
+        Interview Bot is a free practice tool for software engineering interview questions, run
+        by Anastasiia Derevianko as a personal project. By using it you agree to these terms.
       </p>
 
       <h2>Using the app</h2>
@@ -47,13 +38,15 @@
       </p>
 
       <h2>Your data</h2>
-      <p>What the app keeps about you, and why, is set out in the <a href="/privacy.html">privacy policy</a>.</p>
+      <p>
+        What the app keeps about you, and why, is set out in the{" "}
+        <a href="/privacy.html">privacy policy</a>.
+      </p>
 
       <h2>Contact</h2>
       <p>
-        Questions about these terms:
-        <a href="mailto:aderevianko@proton.me">aderevianko@proton.me</a>.
+        Questions about these terms: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
       </p>
-    </main>
-  </body>
-</html>
+    </LegalPage>
+  );
+}

@@ -148,6 +148,14 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
+.legal-page a {
+  color: var(--accent);
+}
+
+.legal-page li {
+  margin-bottom: 0.5rem;
+}
+
 footer.legal {
   display: flex;
   gap: 1rem;
