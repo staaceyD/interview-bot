@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { App } from "../App";
 import { PrivacyPolicy } from "../legal/PrivacyPolicy";
 import { TermsOfService } from "../legal/TermsOfService";
+import { pageFor } from "../pages";
 
 describe("the privacy policy", () => {
   it("says answers are graded but not stored", () => {
@@ -30,7 +32,7 @@ describe("the terms of service", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Terms of service");
     expect(screen.getByRole("link", { name: /privacy policy/i })).toHaveAttribute(
       "href",
-      "/privacy.html",
+      "/privacy",
     );
   });
 
@@ -38,5 +40,19 @@ describe("the terms of service", () => {
     render(<TermsOfService />);
 
     expect(screen.getByRole("link", { name: /interview bot/i })).toHaveAttribute("href", "/");
+  });
+});
+
+describe("the page for a path", () => {
+  it.each([
+    ["/privacy", PrivacyPolicy],
+    ["/privacy/", PrivacyPolicy],
+    ["/terms", TermsOfService],
+    ["/", App],
+    ["/anything-else", App],
+  ])("%s", (path, page) => {
+    const element = pageFor(path) as { type: unknown };
+
+    expect(element.type).toBe(page);
   });
 });

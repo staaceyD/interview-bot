@@ -1,5 +1,6 @@
 import { CONTACT_EMAIL } from "./contact";
 import { LegalPage } from "./LegalPage";
+import { PRIVACY_PATH } from "./paths";
 
 export function TermsOfService() {
   return (
@@ -40,7 +41,7 @@ export function TermsOfService() {
       <h2>Your data</h2>
       <p>
         What the app keeps about you, and why, is set out in the{" "}
-        <a href="/privacy.html">privacy policy</a>.
+        <a href={PRIVACY_PATH}>privacy policy</a>.
       </p>
 
       <h2>Contact</h2>

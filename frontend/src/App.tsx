@@ -6,6 +6,7 @@ import { isHosted } from "./api/types";
 import type { Account, Difficulty, Explanation, Grade, Question, Topic } from "./api/types";
 import { AccountPanel } from "./components/AccountPanel";
 import { GradeCard } from "./components/GradeCard";
+import { PRIVACY_PATH, TERMS_PATH } from "./legal/paths";
 import { ModelPicker } from "./components/ModelPicker";
 import { NoteDialog } from "./components/NoteDialog";
 import { NotesTab } from "./components/NotesTab";
@@ -320,8 +321,8 @@ export function App({ api = defaultApi }: { api?: Api }) {
       )}
 
       <footer className="legal">
-        <a href="/privacy.html">Privacy policy</a>
-        <a href="/terms.html">Terms of service</a>
+        <a href={PRIVACY_PATH}>Privacy policy</a>
+        <a href={TERMS_PATH}>Terms of service</a>
       </footer>
     </main>
   );

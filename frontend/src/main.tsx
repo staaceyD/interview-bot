@@ -1,4 +1,9 @@
-import { App } from "./App";
-import { render } from "./render";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 
-render(<App />);
+import { pageFor } from "./pages";
+import "./styles.css";
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>{pageFor(window.location.pathname)}</StrictMode>,
+);

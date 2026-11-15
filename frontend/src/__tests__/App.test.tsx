@@ -876,11 +876,11 @@ describe("the footer", () => {
     await screen.findByRole("button", { name: /start interview/i });
     expect(screen.getByRole("link", { name: /privacy policy/i })).toHaveAttribute(
       "href",
-      "/privacy.html",
+      "/privacy",
     );
     expect(screen.getByRole("link", { name: /terms of service/i })).toHaveAttribute(
       "href",
-      "/terms.html",
+      "/terms",
     );
   });
 });
