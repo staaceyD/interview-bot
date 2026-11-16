@@ -1,0 +1,53 @@
+import { CONTACT_EMAIL } from "./contact";
+import { LegalPage } from "./LegalPage";
+import { PRIVACY_PATH } from "./paths";
+
+export function TermsOfService() {
+  return (
+    <LegalPage title="Terms of service" updated="15 November 2026">
+      <p>
+        Interview Bot is a free practice tool for software engineering interview questions, run
+        by Anastasiia Derevianko as a personal project. By using it you agree to these terms.
+      </p>
+
+      <h2>Using the app</h2>
+      <ul>
+        <li>It is free, and meant for practising interview questions.</li>
+        <li>
+          Each account gets a limited number of questions a day. Don't try to get around the
+          limit, for example with scripts or many accounts, and don't use the app to send
+          anything unlawful or abusive.
+        </li>
+        <li>
+          Access can be limited or withdrawn from anyone who misuses it, and the app can change
+          or stop at any time.
+        </li>
+      </ul>
+
+      <h2>The questions and grades</h2>
+      <p>
+        Questions, grades and worked answers are written by an AI model. They can be incomplete
+        or wrong, so treat them as practice material, not as authoritative answers or as a
+        prediction of how a real interview will go.
+      </p>
+
+      <h2>No warranty</h2>
+      <p>
+        The app is provided as it is, without warranties of any kind, and may be unavailable at
+        times. To the extent the law allows, its author is not liable for any loss arising from
+        using it.
+      </p>
+
+      <h2>Your data</h2>
+      <p>
+        What the app keeps about you, and why, is set out in the{" "}
+        <a href={PRIVACY_PATH}>privacy policy</a>.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions about these terms: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+      </p>
+    </LegalPage>
+  );
+}

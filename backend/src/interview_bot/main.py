@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -17,6 +17,9 @@ from interview_bot.interviewer import Interviewer
 from interview_bot.llm import LLMClient, LLMError, build_llm_clients
 from interview_bot.quota import Quota
 from interview_bot.store import SessionStore, build_session_store
+
+# The pages React routes to itself; they must match frontend/src/legal/paths.ts.
+FRONTEND_PAGES = ("/privacy", "/terms")
 
 
 def create_app(
@@ -99,6 +102,9 @@ def create_app(
     app.include_router(router)
     app.include_router(auth_router)
     if settings.static_dir is not None:
+        index = settings.static_dir / "index.html"
+        for page in FRONTEND_PAGES:
+            app.add_api_route(page, lambda: FileResponse(index), include_in_schema=False)
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="frontend")
     return app
 
